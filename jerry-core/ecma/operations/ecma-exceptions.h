@@ -26,42 +26,27 @@
  * @{
  */
 
-#if ENABLED (JERRY_ERROR_MESSAGES)
+#if JERRY_ERROR_MESSAGES
 #define ECMA_ERR_MSG(msg) msg
-#else /* !ENABLED (JERRY_ERROR_MESSAGES) */
+#else /* !JERRY_ERROR_MESSAGES */
 #define ECMA_ERR_MSG(msg) NULL
-#endif /* ENABLED (JERRY_ERROR_MESSAGES) */
+#endif /* JERRY_ERROR_MESSAGES */
 
-/**
- * Native errors.
- *
- * See also: 15.11.1, 15.11.6
- */
-typedef enum
-{
-  ECMA_ERROR_NONE,      /**< Not an Error */
-
-  ECMA_ERROR_COMMON,    /**< Error */
-  ECMA_ERROR_EVAL,      /**< EvalError */
-  ECMA_ERROR_RANGE,     /**< RangeError */
-  ECMA_ERROR_REFERENCE, /**< ReferenceError */
-  ECMA_ERROR_SYNTAX,    /**< SyntaxError */
-  ECMA_ERROR_TYPE,      /**< TypeError */
-  ECMA_ERROR_URI        /**< URIError */
-} ecma_standard_error_t;
-
-ecma_standard_error_t ecma_get_error_type (ecma_object_t *error_object);
-ecma_object_t *ecma_new_standard_error (ecma_standard_error_t error_type);
-ecma_object_t *ecma_new_standard_error_with_message (ecma_standard_error_t error_type, ecma_string_t *message_string_p);
-#if ENABLED (JERRY_ERROR_MESSAGES)
-ecma_value_t ecma_raise_standard_error_with_format (ecma_standard_error_t error_type, const char *msg_p, ...);
-#endif /* ENABLED (JERRY_ERROR_MESSAGES) */
+jerry_error_t ecma_get_error_type (ecma_object_t *error_object_p);
+ecma_object_t *ecma_new_standard_error (jerry_error_t error_type, ecma_string_t *message_string_p);
+#if JERRY_ERROR_MESSAGES
+ecma_value_t ecma_raise_standard_error_with_format (jerry_error_t error_type, const char *msg_p, ...);
+#endif /* JERRY_ERROR_MESSAGES */
 ecma_value_t ecma_raise_common_error (const char *msg_p);
 ecma_value_t ecma_raise_range_error (const char *msg_p);
 ecma_value_t ecma_raise_reference_error (const char *msg_p);
 ecma_value_t ecma_raise_syntax_error (const char *msg_p);
 ecma_value_t ecma_raise_type_error (const char *msg_p);
 ecma_value_t ecma_raise_uri_error (const char *msg_p);
+#if JERRY_BUILTIN_PROMISE
+ecma_value_t ecma_new_aggregate_error (ecma_value_t error_list_val, ecma_value_t message_val);
+ecma_value_t ecma_raise_aggregate_error (ecma_value_t error_list_val, ecma_value_t message_val);
+#endif /* JERRY_BUILTIN_PROMISE */
 
 /**
  * @}

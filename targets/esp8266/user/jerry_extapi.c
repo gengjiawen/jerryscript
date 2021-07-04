@@ -26,18 +26,16 @@
 
 #define DELCARE_HANDLER(NAME) \
 static jerry_value_t \
-NAME ## _handler (const jerry_value_t  function_obj_val __UNUSED__, \
-                  const jerry_value_t  this_val __UNUSED__, \
-                  const jerry_value_t  args_p[], \
-                  const jerry_length_t  args_cnt)
+NAME ## _handler (const jerry_call_info_t *call_info_p __UNUSED__, \
+                  const jerry_value_t args_p[], \
+                  const jerry_length_t args_cnt)
 
 #define REGISTER_HANDLER(NAME) \
   register_native_function ( # NAME, NAME ## _handler)
 
 DELCARE_HANDLER(assert) {
   if (args_cnt == 1
-      && jerry_value_is_boolean (args_p[0])
-      && jerry_get_boolean_value (args_p[0]))
+      && jerry_value_is_true (args_p[0]))
   {
     printf (">> Jerry assert true\r\n");
     return jerry_create_boolean (true);

@@ -41,8 +41,13 @@ extern "C"
 #define JERRY_ATTR_PURE __attribute__((pure))
 #define JERRY_ATTR_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
 
+#ifndef JERRY_LIKELY
 #define JERRY_LIKELY(x) __builtin_expect(!!(x), 1)
+#endif /* !JERRY_LIKELY */
+
+#ifndef JERRY_UNLIKELY
 #define JERRY_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#endif /* !JERRY_UNLIKELY */
 
 #endif /* __GNUC__ */
 
@@ -135,13 +140,6 @@ void * __cdecl _alloca (size_t _Size);
 #ifndef JERRY_ATTR_PURE
 #define JERRY_ATTR_PURE
 #endif /* !JERRY_ATTR_PURE */
-
-/**
- * Function attribute to place function in given section.
- */
-#ifndef JERRY_ATTR_SECTION
-#define JERRY_ATTR_SECTION(SECTION)
-#endif /* !JERRY_ATTR_SECTION */
 
 /**
  * Function attribute to trigger warning if function's caller doesn't use (e.g.,

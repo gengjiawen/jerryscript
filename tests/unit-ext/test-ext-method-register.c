@@ -24,13 +24,11 @@
 #include <string.h>
 
 static jerry_value_t
-method_hello (const jerry_value_t jfunc,  /**< function object */
-              const jerry_value_t jthis,  /**< function this */
+method_hello (const jerry_call_info_t *call_info_p, /**< call information */
               const jerry_value_t jargv[], /**< arguments */
               const jerry_length_t jargc) /**< number of arguments */
 {
-  (void) jfunc;
-  (void) jthis;
+  (void) call_info_p;
   (void) jargv;
   return jerry_create_number (jargc);
 } /* method_hello */
@@ -43,10 +41,8 @@ freeze_property (jerry_value_t target_obj, /**< target object */
                  const char *target_prop) /**< target property name */
 {
   // "freeze" property
-  jerry_property_descriptor_t prop_desc;
-  jerry_init_property_descriptor_fields (&prop_desc);
-  prop_desc.is_configurable_defined = true;
-  prop_desc.is_configurable = false;
+  jerry_property_descriptor_t prop_desc = jerry_property_descriptor_create ();
+  prop_desc.flags |= JERRY_PROP_IS_CONFIGURABLE_DEFINED;
 
   jerry_value_t prop_name = jerry_create_string ((const jerry_char_t *) target_prop);
   jerry_value_t return_value = jerry_define_own_property (target_obj, prop_name, &prop_desc);
@@ -54,7 +50,7 @@ freeze_property (jerry_value_t target_obj, /**< target object */
   jerry_release_value (return_value);
   jerry_release_value (prop_name);
 
-  jerry_free_property_descriptor_fields (&prop_desc);
+  jerry_property_descriptor_free (&prop_desc);
 } /* freeze_property */
 
 /**
@@ -105,7 +101,7 @@ test_simple_registration (void)
     const char *test_A = "test.my_str_sz === 'super_'";
     jerry_value_t result = jerry_eval ((const jerry_char_t *) test_A, strlen (test_A), 0);
     TEST_ASSERT (jerry_value_is_boolean (result));
-    TEST_ASSERT (jerry_get_boolean_value (result) == true);
+    TEST_ASSERT (jerry_value_is_true (result));
     jerry_release_value (result);
   }
 
@@ -113,7 +109,7 @@ test_simple_registration (void)
     const char *test_A = "test.my_str === 'super_str'";
     jerry_value_t result = jerry_eval ((const jerry_char_t *) test_A, strlen (test_A), 0);
     TEST_ASSERT (jerry_value_is_boolean (result));
-    TEST_ASSERT (jerry_get_boolean_value (result) == true);
+    TEST_ASSERT (jerry_value_is_true (result));
     jerry_release_value (result);
   }
 
@@ -121,7 +117,7 @@ test_simple_registration (void)
     const char *test_A = "test.my_bool";
     jerry_value_t result = jerry_eval ((const jerry_char_t *) test_A, strlen (test_A), 0);
     TEST_ASSERT (jerry_value_is_boolean (result));
-    TEST_ASSERT (jerry_get_boolean_value (result) == true);
+    TEST_ASSERT (jerry_value_is_true (result));
     jerry_release_value (result);
   }
 
@@ -129,7 +125,7 @@ test_simple_registration (void)
     const char *test_A = "test.my_bool_false";
     jerry_value_t result = jerry_eval ((const jerry_char_t *) test_A, strlen (test_A), 0);
     TEST_ASSERT (jerry_value_is_boolean (result));
-    TEST_ASSERT (jerry_get_boolean_value (result) == false);
+    TEST_ASSERT (jerry_value_is_true (result) == false);
     jerry_release_value (result);
   }
 
@@ -252,7 +248,7 @@ test_error_multiple_functions (void)
     // Test if property "prop_ok" is correctly registered.
     jerry_value_t prop_ok_val = jerry_create_string ((const jerry_char_t *) prop_ok);
     jerry_value_t prop_ok_exists = jerry_has_own_property (target_object, prop_ok_val);
-    TEST_ASSERT (jerry_get_boolean_value (prop_ok_exists) == true);
+    TEST_ASSERT (jerry_value_is_true (prop_ok_exists));
     jerry_release_value (prop_ok_exists);
 
     // Try calling the method
@@ -283,7 +279,7 @@ test_error_multiple_functions (void)
     // The "prop_err" should exist - as it was "freezed" - but it should not be a function
     jerry_value_t prop_err_val = jerry_create_string ((const jerry_char_t *) prop_err);
     jerry_value_t prop_err_exists = jerry_has_own_property (target_object, prop_err_val);
-    TEST_ASSERT (jerry_get_boolean_value (prop_err_exists) == true);
+    TEST_ASSERT (jerry_value_is_true (prop_err_exists));
     jerry_release_value (prop_err_exists);
 
     jerry_value_t prop_err_func = jerry_value_is_function (prop_err_val);
@@ -294,7 +290,7 @@ test_error_multiple_functions (void)
   { // The "prop_not" is not available on the target object
     jerry_value_t prop_not_val = jerry_create_string ((const jerry_char_t *) prop_not);
     jerry_value_t prop_not_exists = jerry_has_own_property (target_object, prop_not_val);
-    TEST_ASSERT (jerry_get_boolean_value (prop_not_exists) == false);
+    TEST_ASSERT (jerry_value_is_true (prop_not_exists) == false);
     jerry_release_value (prop_not_exists);
     jerry_release_value (prop_not_val);
   }

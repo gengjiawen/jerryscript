@@ -64,24 +64,47 @@ ecma_op_get_value_lex_env_base (ecma_object_t *lex_env_p, /**< lexical environme
           *ref_base_lex_env_p = lex_env_p;
           ecma_property_value_t *property_value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
           if (JERRY_UNLIKELY (property_value_p->value == ECMA_VALUE_UNINITIALIZED))
           {
-            return ecma_raise_reference_error (ECMA_ERR_MSG ("Variables declared by let/const must be"
-                                                             " initialized before reading their value."));
+            return ecma_raise_reference_error (ECMA_ERR_MSG (ecma_error_let_const_not_initialized));
           }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
           return ecma_fast_copy_value (property_value_p->value);
         }
         break;
       }
-#if ENABLED (JERRY_ESNEXT)
-      case ECMA_LEXICAL_ENVIRONMENT_HOME_OBJECT_BOUND:
+#if JERRY_ESNEXT
+      case ECMA_LEXICAL_ENVIRONMENT_CLASS:
       {
+#if JERRY_MODULE_SYSTEM
+        if (lex_env_p->type_flags_refs & ECMA_OBJECT_FLAG_LEXICAL_ENV_HAS_DATA)
+        {
+          ecma_property_t *property_p = ecma_find_named_property (lex_env_p, name_p);
+
+          if (property_p != NULL)
+          {
+            *ref_base_lex_env_p = lex_env_p;
+            ecma_property_value_t *property_value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
+
+            if (!(*property_p & ECMA_PROPERTY_FLAG_DATA))
+            {
+              property_value_p = ecma_get_property_value_from_named_reference (property_value_p);
+            }
+
+            if (JERRY_UNLIKELY (property_value_p->value == ECMA_VALUE_UNINITIALIZED))
+            {
+              return ecma_raise_reference_error (ECMA_ERR_MSG (ecma_error_let_const_not_initialized));
+            }
+
+            return ecma_fast_copy_value (property_value_p->value);
+          }
+        }
+#endif /* JERRY_MODULE_SYSTEM */
         break;
       }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
       default:
       {
         JERRY_ASSERT (ecma_get_lex_env_type (lex_env_p) == ECMA_LEXICAL_ENVIRONMENT_THIS_OBJECT_BOUND);
@@ -108,13 +131,13 @@ ecma_op_get_value_lex_env_base (ecma_object_t *lex_env_p, /**< lexical environme
   }
 
   *ref_base_lex_env_p = NULL;
-#if ENABLED (JERRY_ERROR_MESSAGES)
-  return ecma_raise_standard_error_with_format (ECMA_ERROR_REFERENCE,
+#if JERRY_ERROR_MESSAGES
+  return ecma_raise_standard_error_with_format (JERRY_ERROR_REFERENCE,
                                                 "% is not defined",
                                                 ecma_make_string_value (name_p));
-#else /* ENABLED (JERRY_ERROR_MESSAGES) */
+#else /* JERRY_ERROR_MESSAGES */
   return ecma_raise_reference_error (NULL);
-#endif /* ENABLED (JERRY_ERROR_MESSAGES) */
+#endif /* JERRY_ERROR_MESSAGES */
 
 } /* ecma_op_get_value_lex_env_base */
 
@@ -158,34 +181,34 @@ ecma_op_get_value_object_base (ecma_value_t base_value, /**< base value */
         return ecma_make_string_value (ecma_new_ecma_string_from_code_unit (char_at_idx));
       }
 
-#if ENABLED (JERRY_BUILTIN_STRING)
+#if JERRY_BUILTIN_STRING
       id = ECMA_BUILTIN_ID_STRING_PROTOTYPE;
-#endif /* ENABLED (JERRY_BUILTIN_STRING) */
+#endif /* JERRY_BUILTIN_STRING */
     }
     else if (ecma_is_value_number (base_value))
     {
-#if ENABLED (JERRY_BUILTIN_NUMBER)
+#if JERRY_BUILTIN_NUMBER
       id = ECMA_BUILTIN_ID_NUMBER_PROTOTYPE;
-#endif /* ENABLED (JERRY_BUILTIN_NUMBER) */
+#endif /* JERRY_BUILTIN_NUMBER */
     }
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
     else if (ecma_is_value_symbol (base_value))
     {
       id = ECMA_BUILTIN_ID_SYMBOL_PROTOTYPE;
     }
-#endif /* ENABLED (JERRY_ESNEXT) */
-#if ENABLED (JERRY_BUILTIN_BIGINT)
+#endif /* JERRY_ESNEXT */
+#if JERRY_BUILTIN_BIGINT
     else if (ecma_is_value_bigint (base_value))
     {
       id = ECMA_BUILTIN_ID_BIGINT_PROTOTYPE;
     }
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
+#endif /* JERRY_BUILTIN_BIGINT */
     else
     {
       JERRY_ASSERT (ecma_is_value_boolean (base_value));
-#if ENABLED (JERRY_BUILTIN_BOOLEAN)
+#if JERRY_BUILTIN_BOOLEAN
       id = ECMA_BUILTIN_ID_BOOLEAN_PROTOTYPE;
-#endif /* ENABLED (JERRY_BUILTIN_BOOLEAN) */
+#endif /* JERRY_BUILTIN_BOOLEAN */
     }
 
     obj_p = ecma_builtin_get (id);
@@ -215,52 +238,47 @@ ecma_op_put_value_lex_env_base (ecma_object_t *lex_env_p, /**< lexical environme
   {
     switch (ecma_get_lex_env_type (lex_env_p))
     {
+#if JERRY_ESNEXT
+      case ECMA_LEXICAL_ENVIRONMENT_CLASS:
+      {
+        if ((lex_env_p->type_flags_refs & ECMA_OBJECT_FLAG_LEXICAL_ENV_HAS_DATA) == 0)
+        {
+          break;
+        }
+        /* FALLTHRU */
+      }
+#endif /* JERRY_ESNEXT */
       case ECMA_LEXICAL_ENVIRONMENT_DECLARATIVE:
       {
         ecma_property_t *property_p = ecma_find_named_property (lex_env_p, name_p);
 
         if (property_p != NULL)
         {
+#if JERRY_ESNEXT
+          ecma_property_value_t *property_value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
+
+          JERRY_ASSERT (!(*property_p & ECMA_PROPERTY_FLAG_WRITABLE)
+                        || (*property_p & ECMA_PROPERTY_FLAG_DATA));
+
+          if ((*property_p & ECMA_PROPERTY_FLAG_WRITABLE)
+              && property_value_p->value != ECMA_VALUE_UNINITIALIZED)
+          {
+            ecma_named_data_property_assign_value (lex_env_p, property_value_p, value);
+            return ECMA_VALUE_EMPTY;
+          }
+#else /* JERRY_ESNEXT */
           if (ecma_is_property_writable (*property_p))
           {
             ecma_property_value_t *property_value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
-
-#if ENABLED (JERRY_ESNEXT)
-            if (JERRY_UNLIKELY (property_value_p->value == ECMA_VALUE_UNINITIALIZED))
-            {
-              return ecma_raise_reference_error (ECMA_ERR_MSG ("Variables declared by let/const must be"
-                                                               " initialized before writing their value."));
-            }
-#endif /* ENABLED (JERRY_ESNEXT) */
-
             ecma_named_data_property_assign_value (lex_env_p, property_value_p, value);
+            return ECMA_VALUE_EMPTY;
           }
-#if ENABLED (JERRY_ESNEXT)
-          else if (ecma_is_property_enumerable (*property_p))
-          {
-            if (JERRY_UNLIKELY (ECMA_PROPERTY_VALUE_PTR (property_p)->value == ECMA_VALUE_UNINITIALIZED))
-            {
-              return ecma_raise_reference_error (ECMA_ERR_MSG ("Variables declared by let/const must be"
-                                                               " initialized before writing their value."));
-            }
+#endif /* JERRY_ESNEXT */
 
-            return ecma_raise_type_error (ECMA_ERR_MSG ("Constant bindings cannot be reassigned."));
-          }
-#endif /* ENABLED (JERRY_ESNEXT) */
-          else if (is_strict)
-          {
-            return ecma_raise_type_error (ECMA_ERR_MSG ("Binding cannot be set."));
-          }
-          return ECMA_VALUE_EMPTY;
+          return ecma_op_raise_set_binding_error (property_p, is_strict);
         }
         break;
       }
-#if ENABLED (JERRY_ESNEXT)
-      case ECMA_LEXICAL_ENVIRONMENT_HOME_OBJECT_BOUND:
-      {
-        break;
-      }
-#endif /* ENABLED (JERRY_ESNEXT) */
       default:
       {
         JERRY_ASSERT (ecma_get_lex_env_type (lex_env_p) == ECMA_LEXICAL_ENVIRONMENT_THIS_OBJECT_BOUND);
@@ -269,12 +287,12 @@ ecma_op_put_value_lex_env_base (ecma_object_t *lex_env_p, /**< lexical environme
 
         ecma_value_t has_property = ecma_op_object_has_property (binding_obj_p, name_p);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
         if (ECMA_IS_VALUE_ERROR (has_property))
         {
           return has_property;
         }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
         if (ecma_is_value_true (has_property))
         {
@@ -308,13 +326,13 @@ ecma_op_put_value_lex_env_base (ecma_object_t *lex_env_p, /**< lexical environme
 
   if (is_strict)
   {
-#if ENABLED (JERRY_ERROR_MESSAGES)
-    return ecma_raise_standard_error_with_format (ECMA_ERROR_REFERENCE,
+#if JERRY_ERROR_MESSAGES
+    return ecma_raise_standard_error_with_format (JERRY_ERROR_REFERENCE,
                                                   "% is not defined",
                                                   ecma_make_string_value (name_p));
-#else /* !ENABLED (JERRY_ERROR_MESSAGES) */
+#else /* !JERRY_ERROR_MESSAGES */
     return ecma_raise_reference_error (NULL);
-#endif /* ENABLED (JERRY_ERROR_MESSAGES) */
+#endif /* JERRY_ERROR_MESSAGES */
   }
 
   ecma_value_t completion = ecma_op_object_put (ecma_get_lex_env_binding_object (lex_env_p),

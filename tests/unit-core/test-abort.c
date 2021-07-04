@@ -19,13 +19,11 @@
 #include "test-common.h"
 
 static jerry_value_t
-callback_func (const jerry_value_t function_obj,
-               const jerry_value_t this_val,
+callback_func (const jerry_call_info_t *call_info_p,
                const jerry_value_t args_p[],
                const jerry_length_t args_count)
 {
-  JERRY_UNUSED (function_obj);
-  JERRY_UNUSED (this_val);
+  JERRY_UNUSED (call_info_p);
   JERRY_UNUSED (args_p);
   JERRY_UNUSED (args_count);
 
@@ -64,11 +62,9 @@ main (void)
     "}"
   );
 
-  jerry_value_t parsed_code_val = jerry_parse (NULL,
-                                               0,
-                                               inf_loop_code_src1,
+  jerry_value_t parsed_code_val = jerry_parse (inf_loop_code_src1,
                                                sizeof (inf_loop_code_src1) - 1,
-                                               JERRY_PARSE_NO_OPTS);
+                                               NULL);
 
   TEST_ASSERT (!jerry_value_is_error (parsed_code_val));
   res = jerry_run (parsed_code_val);
@@ -99,11 +95,9 @@ main (void)
     " f();\n"
   );
 
-  parsed_code_val = jerry_parse (NULL,
-                                 0,
-                                 inf_loop_code_src2,
+  parsed_code_val = jerry_parse (inf_loop_code_src2,
                                  sizeof (inf_loop_code_src2) - 1,
-                                 JERRY_PARSE_NO_OPTS);
+                                 NULL);
 
   TEST_ASSERT (!jerry_value_is_error (parsed_code_val));
   res = jerry_run (parsed_code_val);

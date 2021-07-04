@@ -22,8 +22,10 @@
 #include "ecma-globals.h"
 #include "ecma-helpers.h"
 #include "jmem.h"
+#include "jcontext.h"
+#include "ecma-function-object.h"
 
-#if ENABLED (JERRY_BUILTIN_TYPEDARRAY)
+#if JERRY_BUILTIN_TYPEDARRAY
 
 /** \addtogroup ecma ECMA
  * @{
@@ -51,9 +53,9 @@ ecma_arraybuffer_new_object (uint32_t length) /**< length of the arraybuffer */
                                                 ECMA_OBJECT_TYPE_CLASS);
 
   ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
-  ext_object_p->u.class_prop.extra_info = ECMA_ARRAYBUFFER_INTERNAL_MEMORY;
-  ext_object_p->u.class_prop.class_id = LIT_MAGIC_STRING_ARRAY_BUFFER_UL;
-  ext_object_p->u.class_prop.u.length = length;
+  ext_object_p->u.cls.type = ECMA_OBJECT_CLASS_ARRAY_BUFFER;
+  ext_object_p->u.cls.u1.array_buffer_flags = ECMA_ARRAYBUFFER_INTERNAL_MEMORY;
+  ext_object_p->u.cls.u3.length = length;
 
   lit_utf8_byte_t *buf = (lit_utf8_byte_t *) (ext_object_p + 1);
   memset (buf, 0, length);
@@ -74,7 +76,7 @@ ecma_arraybuffer_new_object (uint32_t length) /**< length of the arraybuffer */
 ecma_object_t *
 ecma_arraybuffer_new_object_external (uint32_t length, /**< length of the buffer_p to use */
                                       void *buffer_p, /**< pointer for ArrayBuffer's buffer backing */
-                                      ecma_object_native_free_callback_t free_cb) /**< buffer free callback */
+                                      jerry_value_free_callback_t free_cb) /**< buffer free callback */
 {
   ecma_object_t *prototype_obj_p = ecma_builtin_get (ECMA_BUILTIN_ID_ARRAYBUFFER_PROTOTYPE);
   ecma_object_t *object_p = ecma_create_object (prototype_obj_p,
@@ -82,9 +84,9 @@ ecma_arraybuffer_new_object_external (uint32_t length, /**< length of the buffer
                                                 ECMA_OBJECT_TYPE_CLASS);
 
   ecma_arraybuffer_external_info *array_object_p = (ecma_arraybuffer_external_info *) object_p;
-  array_object_p->extended_object.u.class_prop.extra_info = ECMA_ARRAYBUFFER_EXTERNAL_MEMORY;
-  array_object_p->extended_object.u.class_prop.class_id = LIT_MAGIC_STRING_ARRAY_BUFFER_UL;
-  array_object_p->extended_object.u.class_prop.u.length = length;
+  array_object_p->extended_object.u.cls.type = ECMA_OBJECT_CLASS_ARRAY_BUFFER;
+  array_object_p->extended_object.u.cls.u1.array_buffer_flags = ECMA_ARRAYBUFFER_EXTERNAL_MEMORY;
+  array_object_p->extended_object.u.cls.u3.length = length;
 
   array_object_p->buffer_p = buffer_p;
   array_object_p->free_cb = free_cb;
@@ -107,6 +109,14 @@ ecma_op_create_arraybuffer_object (const ecma_value_t *arguments_list_p, /**< li
 {
   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
 
+  ecma_object_t *proto_p = ecma_op_get_prototype_from_constructor (JERRY_CONTEXT (current_new_target_p),
+                                                                   ECMA_BUILTIN_ID_ARRAYBUFFER_PROTOTYPE);
+
+  if (proto_p == NULL)
+  {
+    return ECMA_VALUE_ERROR;
+  }
+
   ecma_number_t length_num = 0;
 
   if (arguments_list_len > 0)
@@ -122,6 +132,7 @@ ecma_op_create_arraybuffer_object (const ecma_value_t *arguments_list_p, /**< li
 
       if (ECMA_IS_VALUE_ERROR (to_number_value))
       {
+        ecma_deref_object (proto_p);
         return to_number_value;
       }
     }
@@ -135,13 +146,18 @@ ecma_op_create_arraybuffer_object (const ecma_value_t *arguments_list_p, /**< li
 
     if (length_num <= -1.0 || length_num > (ecma_number_t) maximum_size_in_byte + 0.5)
     {
-      return ecma_raise_range_error (ECMA_ERR_MSG ("Invalid ArrayBuffer length."));
+      ecma_deref_object (proto_p);
+      return ecma_raise_range_error (ECMA_ERR_MSG ("Invalid ArrayBuffer length"));
     }
   }
 
   uint32_t length_uint32 = ecma_number_to_uint32 (length_num);
 
-  return ecma_make_object_value (ecma_arraybuffer_new_object (length_uint32));
+  ecma_object_t *array_buffer = ecma_arraybuffer_new_object (length_uint32);
+  ECMA_SET_NON_NULL_POINTER (array_buffer->u2.prototype_cp, proto_p);
+  ecma_deref_object (proto_p);
+
+  return ecma_make_object_value (array_buffer);
 } /* ecma_op_create_arraybuffer_object */
 
 /**
@@ -157,8 +173,7 @@ bool
 ecma_is_arraybuffer (ecma_value_t target) /**< the target value */
 {
   return (ecma_is_value_object (target)
-          && ecma_object_class_is (ecma_get_object_from_value (target),
-                                   LIT_MAGIC_STRING_ARRAY_BUFFER_UL));
+          && ecma_object_class_is (ecma_get_object_from_value (target), ECMA_OBJECT_CLASS_ARRAY_BUFFER));
 } /* ecma_is_arraybuffer */
 
 /**
@@ -169,10 +184,10 @@ ecma_is_arraybuffer (ecma_value_t target) /**< the target value */
 uint32_t JERRY_ATTR_PURE
 ecma_arraybuffer_get_length (ecma_object_t *object_p) /**< pointer to the ArrayBuffer object */
 {
-  JERRY_ASSERT (ecma_object_class_is (object_p, LIT_MAGIC_STRING_ARRAY_BUFFER_UL));
+  JERRY_ASSERT (ecma_object_class_is (object_p, ECMA_OBJECT_CLASS_ARRAY_BUFFER));
 
   ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
-  return ecma_arraybuffer_is_detached (object_p) ? 0 : ext_object_p->u.class_prop.u.length;
+  return ecma_arraybuffer_is_detached (object_p) ? 0 : ext_object_p->u.cls.u3.length;
 } /* ecma_arraybuffer_get_length */
 
 /**
@@ -180,10 +195,10 @@ ecma_arraybuffer_get_length (ecma_object_t *object_p) /**< pointer to the ArrayB
  *
  * @return pointer to the data buffer
  */
-inline lit_utf8_byte_t * JERRY_ATTR_PURE JERRY_ATTR_ALWAYS_INLINE
+extern inline lit_utf8_byte_t * JERRY_ATTR_PURE JERRY_ATTR_ALWAYS_INLINE
 ecma_arraybuffer_get_buffer (ecma_object_t *object_p) /**< pointer to the ArrayBuffer object */
 {
-  JERRY_ASSERT (ecma_object_class_is (object_p, LIT_MAGIC_STRING_ARRAY_BUFFER_UL));
+  JERRY_ASSERT (ecma_object_class_is (object_p, ECMA_OBJECT_CLASS_ARRAY_BUFFER));
 
   ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
 
@@ -193,7 +208,7 @@ ecma_arraybuffer_get_buffer (ecma_object_t *object_p) /**< pointer to the ArrayB
     JERRY_ASSERT (!ecma_arraybuffer_is_detached (object_p) || array_p->buffer_p == NULL);
     return (lit_utf8_byte_t *) array_p->buffer_p;
   }
-  else if (ext_object_p->u.class_prop.extra_info & ECMA_ARRAYBUFFER_DETACHED)
+  else if (ext_object_p->u.cls.u1.array_buffer_flags & ECMA_ARRAYBUFFER_DETACHED)
   {
     return NULL;
   }
@@ -207,12 +222,12 @@ ecma_arraybuffer_get_buffer (ecma_object_t *object_p) /**< pointer to the ArrayB
  * @return true - if value is an detached ArrayBuffer object
  *         false - otherwise
  */
-inline bool JERRY_ATTR_PURE JERRY_ATTR_ALWAYS_INLINE
+extern inline bool JERRY_ATTR_PURE JERRY_ATTR_ALWAYS_INLINE
 ecma_arraybuffer_is_detached (ecma_object_t *object_p) /**< pointer to the ArrayBuffer object */
 {
-  JERRY_ASSERT (ecma_object_class_is (object_p, LIT_MAGIC_STRING_ARRAY_BUFFER_UL));
+  JERRY_ASSERT (ecma_object_class_is (object_p, ECMA_OBJECT_CLASS_ARRAY_BUFFER));
 
-  return (((ecma_extended_object_t *) object_p)->u.class_prop.extra_info & ECMA_ARRAYBUFFER_DETACHED) != 0;
+  return (((ecma_extended_object_t *) object_p)->u.cls.u1.array_buffer_flags & ECMA_ARRAYBUFFER_DETACHED) != 0;
 } /* ecma_arraybuffer_is_detached */
 
 /**
@@ -223,10 +238,10 @@ ecma_arraybuffer_is_detached (ecma_object_t *object_p) /**< pointer to the Array
  * @return true - if detach op succeeded
  *         false - otherwise
  */
-inline bool JERRY_ATTR_ALWAYS_INLINE
+extern inline bool JERRY_ATTR_ALWAYS_INLINE
 ecma_arraybuffer_detach (ecma_object_t *object_p) /**< pointer to the ArrayBuffer object */
 {
-  JERRY_ASSERT (ecma_object_class_is (object_p, LIT_MAGIC_STRING_ARRAY_BUFFER_UL));
+  JERRY_ASSERT (ecma_object_class_is (object_p, ECMA_OBJECT_CLASS_ARRAY_BUFFER));
 
   if (ecma_arraybuffer_is_detached (object_p))
   {
@@ -234,7 +249,7 @@ ecma_arraybuffer_detach (ecma_object_t *object_p) /**< pointer to the ArrayBuffe
   }
 
   ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
-  ext_object_p->u.class_prop.extra_info |= ECMA_ARRAYBUFFER_DETACHED;
+  ext_object_p->u.cls.u1.array_buffer_flags |= ECMA_ARRAYBUFFER_DETACHED;
 
   if (ECMA_ARRAYBUFFER_HAS_EXTERNAL_MEMORY (ext_object_p))
   {
@@ -246,7 +261,7 @@ ecma_arraybuffer_detach (ecma_object_t *object_p) /**< pointer to the ArrayBuffe
       array_p->free_cb = NULL;
     }
 
-    ext_object_p->u.class_prop.u.length = 0;
+    ext_object_p->u.cls.u3.length = 0;
     array_p->buffer_p = NULL;
   }
 
@@ -257,4 +272,4 @@ ecma_arraybuffer_detach (ecma_object_t *object_p) /**< pointer to the ArrayBuffe
  * @}
  * @}
  */
-#endif /* ENABLED (JERRY_BUILTIN_TYPEDARRAY) */
+#endif /* JERRY_BUILTIN_TYPEDARRAY */

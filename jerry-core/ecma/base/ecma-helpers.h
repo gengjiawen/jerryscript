@@ -209,11 +209,11 @@ typedef enum
  *
  * @param obj_p ecma-object
  */
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
 #define ECMA_OBJECT_IS_PROXY(obj_p) (ECMA_OBJECT_TYPE_IS_PROXY (ecma_get_object_type ((obj_p))))
-#else /* !ENABLED (JERRY_BUILTIN_PROXY) */
+#else /* !JERRY_BUILTIN_PROXY */
 #define ECMA_OBJECT_IS_PROXY(obj_p) (false)
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
 /* ecma-helpers-value.c */
 ecma_type_t JERRY_ATTR_CONST ecma_get_value_type_field (ecma_value_t value);
@@ -234,6 +234,7 @@ bool JERRY_ATTR_CONST ecma_is_value_float_number (ecma_value_t value);
 bool JERRY_ATTR_CONST ecma_is_value_number (ecma_value_t value);
 bool JERRY_ATTR_CONST ecma_is_value_string (ecma_value_t value);
 bool JERRY_ATTR_CONST ecma_is_value_symbol (ecma_value_t value);
+bool JERRY_ATTR_CONST ecma_is_value_magic_string (ecma_value_t value, lit_magic_string_id_t id);
 bool JERRY_ATTR_CONST ecma_is_value_bigint (ecma_value_t value);
 bool JERRY_ATTR_CONST ecma_is_value_prop_name (ecma_value_t value);
 bool JERRY_ATTR_CONST ecma_is_value_direct_string (ecma_value_t value);
@@ -253,9 +254,9 @@ ecma_value_t ecma_make_number_value (ecma_number_t ecma_number);
 ecma_value_t ecma_make_int32_value (int32_t int32_number);
 ecma_value_t ecma_make_uint32_value (uint32_t uint32_number);
 ecma_value_t JERRY_ATTR_PURE ecma_make_string_value (const ecma_string_t *ecma_string_p);
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 ecma_value_t JERRY_ATTR_PURE ecma_make_symbol_value (const ecma_string_t *ecma_symbol_p);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 ecma_value_t JERRY_ATTR_PURE ecma_make_prop_name_value (const ecma_string_t *ecma_prop_name_p);
 ecma_value_t JERRY_ATTR_PURE ecma_make_magic_string_value (lit_magic_string_id_t id);
 ecma_value_t JERRY_ATTR_PURE ecma_make_object_value (const ecma_object_t *object_p);
@@ -266,9 +267,9 @@ ecma_number_t JERRY_ATTR_PURE ecma_get_float_from_value (ecma_value_t value);
 ecma_number_t * ecma_get_pointer_from_float_value (ecma_value_t value);
 ecma_number_t JERRY_ATTR_PURE ecma_get_number_from_value (ecma_value_t value);
 ecma_string_t JERRY_ATTR_PURE *ecma_get_string_from_value (ecma_value_t value);
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 ecma_string_t JERRY_ATTR_PURE *ecma_get_symbol_from_value (ecma_value_t value);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 ecma_string_t JERRY_ATTR_PURE *ecma_get_prop_name_from_value (ecma_value_t value);
 ecma_object_t JERRY_ATTR_PURE *ecma_get_object_from_value (ecma_value_t value);
 ecma_extended_primitive_t JERRY_ATTR_PURE *ecma_get_extended_primitive_from_value (ecma_value_t value);
@@ -289,37 +290,40 @@ void ecma_free_number (ecma_value_t value);
 lit_magic_string_id_t ecma_get_typeof_lit_id (ecma_value_t value);
 
 /* ecma-helpers-string.c */
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 ecma_string_t *ecma_new_symbol_from_descriptor_string (ecma_value_t string_desc);
 bool ecma_prop_name_is_symbol (ecma_string_t *string_p);
 ecma_length_t ecma_op_advance_string_index (ecma_string_t *str_p, ecma_length_t index_num, bool is_unicode);
-#endif /* ENABLED (JERRY_ESNEXT) */
-#if ENABLED (JERRY_BUILTIN_MAP) || ENABLED (JERRY_BUILTIN_SET)
+#endif /* JERRY_ESNEXT */
+#if JERRY_BUILTIN_MAP || JERRY_BUILTIN_SET
 ecma_string_t *ecma_new_map_key_string (ecma_value_t value);
 bool ecma_prop_name_is_map_key (ecma_string_t *string_p);
-#endif /* ENABLED (JERRY_BUILTIN_MAP) || ENABLED (JERRY_BUILTIN_SET) */
+#endif /* JERRY_BUILTIN_MAP || JERRY_BUILTIN_SET */
 ecma_string_t *ecma_new_ecma_string_from_utf8 (const lit_utf8_byte_t *string_p, lit_utf8_size_t string_size);
 ecma_string_t *ecma_new_ecma_string_from_utf8_converted_to_cesu8 (const lit_utf8_byte_t *string_p,
                                                                   lit_utf8_size_t string_size);
 ecma_string_t *ecma_new_ecma_external_string_from_cesu8 (const lit_utf8_byte_t *string_p, lit_utf8_size_t string_size,
-                                                         ecma_object_native_free_callback_t free_cb);
+                                                         jerry_value_free_callback_t free_cb);
 ecma_string_t *ecma_new_ecma_string_from_code_unit (ecma_char_t code_unit);
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 ecma_string_t *ecma_new_ecma_string_from_code_units (ecma_char_t first_code_unit, ecma_char_t second_code_unit);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 ecma_string_t *ecma_new_ecma_string_from_length (ecma_length_t index);
 ecma_string_t *ecma_new_ecma_string_from_uint32 (uint32_t uint32_number);
 ecma_string_t *ecma_new_non_direct_string_from_uint32 (uint32_t uint32_number);
 ecma_string_t *ecma_get_ecma_string_from_uint32 (uint32_t uint32_number);
 ecma_string_t *ecma_new_ecma_string_from_number (ecma_number_t num);
 ecma_string_t *ecma_get_magic_string (lit_magic_string_id_t id);
+ecma_string_t *ecma_get_internal_string (lit_magic_string_id_t id);
 ecma_string_t *ecma_append_chars_to_string (ecma_string_t *string1_p,
                                             const lit_utf8_byte_t *cesu8_string2_p,
                                             lit_utf8_size_t cesu8_string2_size,
                                             lit_utf8_size_t cesu8_string2_length);
 ecma_string_t *ecma_concat_ecma_strings (ecma_string_t *string1_p, ecma_string_t *string2_p);
 void ecma_ref_ecma_string (ecma_string_t *string_p);
+void ecma_ref_ecma_string_non_direct (ecma_string_t *string_p);
 void ecma_deref_ecma_string (ecma_string_t *string_p);
+void ecma_deref_ecma_string_non_direct (ecma_string_t *string_p);
 void ecma_destroy_ecma_string (ecma_string_t *string_p);
 ecma_number_t ecma_string_to_number (const ecma_string_t *str_p);
 uint32_t ecma_string_get_array_index (const ecma_string_t *str_p);
@@ -354,6 +358,9 @@ const lit_utf8_byte_t *ecma_string_get_chars (const ecma_string_t *string_p,
 bool ecma_compare_ecma_string_to_magic_id (const ecma_string_t *string_p, lit_magic_string_id_t id);
 bool ecma_string_is_empty (const ecma_string_t *string_p);
 bool ecma_string_is_length (const ecma_string_t *string_p);
+#if JERRY_ESNEXT
+bool ecma_compare_ecma_string_to_global_symbol (ecma_string_t *string_p, lit_magic_string_id_t property_id);
+#endif /* JERRY_ESNEXT */
 
 jmem_cpointer_t ecma_string_to_property_name (ecma_string_t *prop_name_p, ecma_property_t *name_type_p);
 ecma_string_t *ecma_string_from_property_name (ecma_property_t property, jmem_cpointer_t prop_name_cp);
@@ -380,12 +387,12 @@ const lit_utf8_byte_t *ecma_string_trim_back (const lit_utf8_byte_t *start_p, co
 void ecma_string_trim_helper (const lit_utf8_byte_t **utf8_str_p,
                               lit_utf8_size_t *utf8_str_size);
 ecma_string_t *ecma_string_trim (const ecma_string_t *string_p);
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 ecma_value_t ecma_string_pad (ecma_value_t original_string_p,
                               ecma_value_t max_length,
                               ecma_value_t fill_string,
                               bool pad_on_start);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 ecma_stringbuilder_t ecma_stringbuilder_create (void);
 ecma_stringbuilder_t ecma_stringbuilder_create_from (ecma_string_t *string_p);
@@ -439,9 +446,9 @@ void ecma_collection_destroy (ecma_collection_t *collection_p);
 void ecma_collection_free (ecma_collection_t *collection_p);
 void ecma_collection_free_if_not_object (ecma_collection_t *collection_p);
 void ecma_collection_free_objects (ecma_collection_t *collection_p);
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 void ecma_collection_free_template_literal (ecma_collection_t *collection_p);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 bool ecma_collection_check_duplicated_entries (ecma_collection_t *collection_p);
 bool ecma_collection_has_string_value (ecma_collection_t *collection_p, ecma_string_t *string_p);
 
@@ -453,11 +460,14 @@ void ecma_compact_collection_free (ecma_value_t *compact_collection_p);
 /* ecma-helpers.c */
 ecma_object_t *ecma_create_object (ecma_object_t *prototype_object_p, size_t ext_object_size, ecma_object_type_t type);
 ecma_object_t *ecma_create_decl_lex_env (ecma_object_t *outer_lexical_environment_p);
-ecma_object_t *ecma_create_object_lex_env (ecma_object_t *outer_lexical_environment_p, ecma_object_t *binding_obj_p,
-                                           ecma_lexical_environment_type_t type);
+ecma_object_t *ecma_create_object_lex_env (ecma_object_t *outer_lexical_environment_p, ecma_object_t *binding_obj_p);
+#if JERRY_ESNEXT
+ecma_object_t *ecma_create_lex_env_class (ecma_object_t *outer_lexical_environment_p, size_t lexical_env_size);
+#endif /* JERRY_ESNEXT */
 bool JERRY_ATTR_PURE ecma_is_lexical_environment (const ecma_object_t *object_p);
 void ecma_op_ordinary_object_set_extensible (ecma_object_t *object_p);
 ecma_object_type_t JERRY_ATTR_PURE ecma_get_object_type (const ecma_object_t *object_p);
+bool JERRY_ATTR_PURE ecma_object_class_is (ecma_object_t *object_p, ecma_object_class_type_t class_id);
 bool JERRY_ATTR_PURE ecma_get_object_is_builtin (const ecma_object_t *object_p);
 void ecma_set_object_is_builtin (ecma_object_t *object_p);
 uint8_t ecma_get_object_builtin_id (ecma_object_t *object_p);
@@ -471,12 +481,14 @@ ecma_create_named_data_property (ecma_object_t *object_p, ecma_string_t *name_p,
 ecma_property_value_t *
 ecma_create_named_accessor_property (ecma_object_t *object_p, ecma_string_t *name_p, ecma_object_t *get_p,
                                      ecma_object_t *set_p, uint8_t prop_attributes, ecma_property_t **out_prop_p);
+#if JERRY_MODULE_SYSTEM
+void ecma_create_named_reference_property (ecma_object_t *object_p, ecma_string_t *name_p,
+                                           ecma_property_t *property_p);
+#endif /* JERRY_MODULE_SYSTEM */
 ecma_property_t *
 ecma_find_named_property (ecma_object_t *obj_p, ecma_string_t *name_p);
 ecma_property_value_t *
 ecma_get_named_data_property (ecma_object_t *obj_p, ecma_string_t *name_p);
-
-void ecma_free_property (ecma_object_t *object_p, jmem_cpointer_t name_cp, ecma_property_t *property_p);
 
 void ecma_delete_property (ecma_object_t *object_p, ecma_property_value_t *prop_value_p);
 
@@ -489,6 +501,10 @@ void ecma_set_named_accessor_property_getter (ecma_object_t *object_p, ecma_prop
                                               ecma_object_t *getter_p);
 void ecma_set_named_accessor_property_setter (ecma_object_t *object_p, ecma_property_value_t *prop_value_p,
                                               ecma_object_t *setter_p);
+#if JERRY_MODULE_SYSTEM
+ecma_property_value_t *
+ecma_get_property_value_from_named_reference (ecma_property_value_t *reference_p);
+#endif /* JERRY_MODULE_SYSTEM */
 bool ecma_is_property_writable (ecma_property_t property);
 void ecma_set_property_writable_attr (ecma_property_t *property_p, bool is_writable);
 bool ecma_is_property_enumerable (ecma_property_t property);
@@ -496,19 +512,19 @@ void ecma_set_property_enumerable_attr (ecma_property_t *property_p, bool is_enu
 bool ecma_is_property_configurable (ecma_property_t property);
 void ecma_set_property_configurable_attr (ecma_property_t *property_p, bool is_configurable);
 
-#if ENABLED (JERRY_LCACHE)
+#if JERRY_LCACHE
 bool ecma_is_property_lcached (ecma_property_t *property_p);
 void ecma_set_property_lcached (ecma_property_t *property_p, bool is_lcached);
-#endif /* ENABLED (JERRY_LCACHE) */
+#endif /* JERRY_LCACHE */
 
 ecma_property_descriptor_t ecma_make_empty_property_descriptor (void);
 void ecma_free_property_descriptor (ecma_property_descriptor_t *prop_desc_p);
 
 void ecma_ref_extended_primitive (ecma_extended_primitive_t *primitve_p);
 void ecma_deref_error_reference (ecma_extended_primitive_t *error_ref_p);
-#if ENABLED (JERRY_BUILTIN_BIGINT)
+#if JERRY_BUILTIN_BIGINT
 void ecma_deref_bigint (ecma_extended_primitive_t *bigint_p);
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
+#endif /* JERRY_BUILTIN_BIGINT */
 
 ecma_value_t ecma_create_error_reference (ecma_value_t value, bool is_exception);
 ecma_value_t ecma_create_error_reference_from_context (void);
@@ -518,20 +534,22 @@ void ecma_raise_error_from_error_reference (ecma_value_t value);
 void ecma_bytecode_ref (ecma_compiled_code_t *bytecode_p);
 void ecma_bytecode_deref (ecma_compiled_code_t *bytecode_p);
 ecma_value_t *ecma_compiled_code_resolve_arguments_start (const ecma_compiled_code_t *bytecode_header_p);
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 ecma_value_t *ecma_compiled_code_resolve_function_name (const ecma_compiled_code_t *bytecode_header_p);
 uint32_t ecma_compiled_code_resolve_extended_info (const ecma_compiled_code_t *bytecode_header_p);
 ecma_collection_t *ecma_compiled_code_get_tagged_template_collection (const ecma_compiled_code_t *bytecode_header_p);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 ecma_value_t ecma_get_resource_name (const ecma_compiled_code_t *bytecode_p);
 #if (JERRY_STACK_LIMIT != 0)
 uintptr_t ecma_get_current_stack_usage (void);
 #endif /* (JERRY_STACK_LIMIT != 0) */
 
 /* ecma-helpers-external-pointers.c */
-bool ecma_create_native_pointer_property (ecma_object_t *obj_p, void *native_p, void *info_p);
-ecma_native_pointer_t *ecma_get_native_pointer_value (ecma_object_t *obj_p, void *info_p);
-bool ecma_delete_native_pointer_property (ecma_object_t *obj_p, void *info_p);
+bool ecma_create_native_pointer_property (ecma_object_t *obj_p, void *native_p,
+                                          const jerry_object_native_info_t *native_info_p);
+ecma_native_pointer_t *ecma_get_native_pointer_value (ecma_object_t *obj_p,
+                                                      const jerry_object_native_info_t *native_info_p);
+bool ecma_delete_native_pointer_property (ecma_object_t *obj_p, const jerry_object_native_info_t *native_info_p);
 
 /* ecma-helpers-conversion.c */
 ecma_number_t ecma_utf8_string_to_number (const lit_utf8_byte_t *str_p, lit_utf8_size_t str_size,

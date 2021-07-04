@@ -40,6 +40,10 @@
 # define JERRY_BUILTIN_ARRAY JERRY_BUILTINS
 #endif /* !defined (JERRY_BUILTIN_ARRAY) */
 
+#ifndef JERRY_BUILTIN_BOOLEAN
+# define JERRY_BUILTIN_BOOLEAN JERRY_BUILTINS
+#endif /* !defined (JERRY_BUILTIN_BOOLEAN) */
+
 #ifndef JERRY_BUILTIN_DATE
 # define JERRY_BUILTIN_DATE JERRY_BUILTINS
 #endif /* !defined (JERRY_BUILTIN_DATE) */
@@ -47,10 +51,6 @@
 #ifndef JERRY_BUILTIN_ERRORS
 # define JERRY_BUILTIN_ERRORS JERRY_BUILTINS
 #endif /* !defined (JERRY_BUILTIN_ERRORS) */
-
-#ifndef JERRY_BUILTIN_BOOLEAN
-# define JERRY_BUILTIN_BOOLEAN JERRY_BUILTINS
-#endif /* !defined (JERRY_BUILTIN_BOOLEAN) */
 
 #ifndef JERRY_BUILTIN_JSON
 # define JERRY_BUILTIN_JSON JERRY_BUILTINS
@@ -79,29 +79,21 @@
 # define JERRY_ESNEXT 1
 #endif /* !defined (JERRY_ESNEXT) */
 
-#ifndef JERRY_BUILTIN_REALMS
-# define JERRY_BUILTIN_REALMS JERRY_ESNEXT
-#endif /* !defined (JERRY_BUILTIN_REALMS) */
+#ifndef JERRY_BUILTIN_BIGINT
+# define JERRY_BUILTIN_BIGINT JERRY_ESNEXT
+#endif /* !defined (JERRY_BUILTIN_BIGINT) */
 
 #ifndef JERRY_BUILTIN_DATAVIEW
 # define JERRY_BUILTIN_DATAVIEW JERRY_ESNEXT
 #endif /* !defined (JERRY_BUILTIN_DATAVIEW) */
 
+#ifndef JERRY_BUILTIN_GLOBAL_THIS
+# define JERRY_BUILTIN_GLOBAL_THIS JERRY_ESNEXT
+#endif /* !defined (JERRY_BUILTIN_GLOBAL_THIS) */
+
 #ifndef JERRY_BUILTIN_MAP
 # define JERRY_BUILTIN_MAP JERRY_ESNEXT
 #endif /* !defined (JERRY_BUILTIN_MAP) */
-
-#ifndef JERRY_BUILTIN_SET
-# define JERRY_BUILTIN_SET JERRY_ESNEXT
-#endif /* !defined (JERRY_BUILTIN_SET) */
-
-#ifndef JERRY_BUILTIN_WEAKMAP
-# define JERRY_BUILTIN_WEAKMAP JERRY_ESNEXT
-#endif /* !defined (JERRY_BUILTIN_WEAKMAP) */
-
-#ifndef JERRY_BUILTIN_WEAKSET
-# define JERRY_BUILTIN_WEAKSET JERRY_ESNEXT
-#endif /* !defined (JERRY_BUILTIN_WEAKSET) */
 
 #ifndef JERRY_BUILTIN_PROMISE
 # define JERRY_BUILTIN_PROMISE JERRY_ESNEXT
@@ -111,17 +103,33 @@
 # define JERRY_BUILTIN_PROXY JERRY_ESNEXT
 #endif /* !defined (JERRY_BUILTIN_PROXY) */
 
+#ifndef JERRY_BUILTIN_REALMS
+# define JERRY_BUILTIN_REALMS JERRY_ESNEXT
+#endif /* !defined (JERRY_BUILTIN_REALMS) */
+
 #ifndef JERRY_BUILTIN_REFLECT
 # define JERRY_BUILTIN_REFLECT JERRY_ESNEXT
 #endif /* !defined (JERRY_BUILTIN_REFLECT) */
+
+#ifndef JERRY_BUILTIN_SET
+# define JERRY_BUILTIN_SET JERRY_ESNEXT
+#endif /* !defined (JERRY_BUILTIN_SET) */
 
 #ifndef JERRY_BUILTIN_TYPEDARRAY
 # define JERRY_BUILTIN_TYPEDARRAY JERRY_ESNEXT
 #endif /* !defined (JERRY_BUILTIN_TYPEDARRAY) */
 
-#ifndef JERRY_BUILTIN_BIGINT
-# define JERRY_BUILTIN_BIGINT JERRY_ESNEXT
-#endif /* !defined (JERRY_BUILTIN_BIGINT) */
+#ifndef JERRY_BUILTIN_WEAKMAP
+# define JERRY_BUILTIN_WEAKMAP JERRY_ESNEXT
+#endif /* !defined (JERRY_BUILTIN_WEAKMAP) */
+
+#ifndef JERRY_BUILTIN_WEAKREF
+# define JERRY_BUILTIN_WEAKREF JERRY_ESNEXT
+#endif /* !defined (JERRY_BUILTIN_WEAKREF) */
+
+#ifndef JERRY_BUILTIN_WEAKSET
+# define JERRY_BUILTIN_WEAKSET JERRY_ESNEXT
+#endif /* !defined (JERRY_BUILTIN_WEAKSET) */
 
 #ifndef JERRY_MODULE_SYSTEM
 # define JERRY_MODULE_SYSTEM JERRY_ESNEXT
@@ -340,9 +348,18 @@
  *
  * Default value: 1
  */
-#ifndef JERRY_PROPRETY_HASHMAP
-# define JERRY_PROPRETY_HASHMAP 1
-#endif /* !defined (JERRY_PROPRETY_HASHMAP) */
+#ifndef JERRY_PROPERTY_HASHMAP
+# define JERRY_PROPERTY_HASHMAP 1
+#endif /* !defined (JERRY_PROPERTY_HASHMAP) */
+
+/**
+ * Enables/disables the Promise event callbacks
+ *
+ * Default value: 0
+ */
+#ifndef JERRY_PROMISE_CALLBACK
+# define JERRY_PROMISE_CALLBACK 0
+#endif /* !defined (JERRY_PROMISE_CALLBACK) */
 
 /**
  * Enable/Disable byte code dump functions for RegExp objects.
@@ -535,6 +552,10 @@
 || ((JERRY_BUILTIN_DATAVIEW != 0) && (JERRY_BUILTIN_DATAVIEW != 1))
 # error "Invalid value for JERRY_BUILTIN_DATAVIEW macro."
 #endif
+#if !defined (JERRY_BUILTIN_GLOBAL_THIS) \
+|| ((JERRY_BUILTIN_GLOBAL_THIS != 0) && (JERRY_BUILTIN_GLOBAL_THIS != 1))
+# error "Invalid value for JERRY_BUILTIN_GLOBAL_THIS macro."
+#endif /* !defined (JERRY_BUILTIN_GLOBAL_THIS) */
 #if !defined (JERRY_BUILTIN_MAP) \
 || ((JERRY_BUILTIN_MAP != 0) && (JERRY_BUILTIN_MAP != 1))
 # error "Invalid value for JERRY_BUILTIN_MAP macro."
@@ -550,6 +571,10 @@
 #if !defined (JERRY_BUILTIN_WEAKMAP) \
 || ((JERRY_BUILTIN_WEAKMAP != 0) && (JERRY_BUILTIN_WEAKMAP != 1))
 # error "Invalid value for JERRY_BUILTIN_WEAKMAP macro."
+#endif
+#if !defined (JERRY_BUILTIN_WEAKREF) \
+|| ((JERRY_BUILTIN_WEAKREF != 0) && (JERRY_BUILTIN_WEAKREF != 1))
+# error "Invalid value for JERRY_BUILTIN_WEAKREF macro."
 #endif
 #if !defined (JERRY_BUILTIN_WEAKSET) \
 || ((JERRY_BUILTIN_WEAKSET != 0) && (JERRY_BUILTIN_WEAKSET != 1))
@@ -580,10 +605,12 @@
 || (JERRY_BUILTIN_MAP == 1) \
 || (JERRY_BUILTIN_SET == 1) \
 || (JERRY_BUILTIN_WEAKMAP == 1) \
+|| (JERRY_BUILTIN_WEAKREF == 1) \
 || (JERRY_BUILTIN_WEAKSET == 1) \
 || (JERRY_BUILTIN_PROMISE == 1) \
 || (JERRY_BUILTIN_PROXY == 1) \
 || (JERRY_BUILTIN_REFLECT == 1) \
+|| (JERRY_BUILTIN_PROMISE == 1) \
 || (JERRY_BUILTIN_TYPEDARRAY == 1))
 # error "JERRY_ESNEXT should be enabled too to enable JERRY_BUILTIN_xxxxx macro."
 #endif
@@ -654,9 +681,13 @@
 || ((JERRY_PARSER_DUMP_BYTE_CODE != 0) && (JERRY_PARSER_DUMP_BYTE_CODE != 1))
 # error "Invalid value for 'JERRY_PARSER_DUMP_BYTE_CODE' macro."
 #endif
-#if !defined (JERRY_PROPRETY_HASHMAP) \
-|| ((JERRY_PROPRETY_HASHMAP != 0) && (JERRY_PROPRETY_HASHMAP != 1))
-# error "Invalid value for 'JERRY_PROPRETY_HASHMAP' macro."
+#if !defined (JERRY_PROPERTY_HASHMAP) \
+|| ((JERRY_PROPERTY_HASHMAP != 0) && (JERRY_PROPERTY_HASHMAP != 1))
+# error "Invalid value for 'JERRY_PROPERTY_HASHMAP' macro."
+#endif
+#if !defined (JERRY_PROMISE_CALLBACK) \
+|| ((JERRY_PROMISE_CALLBACK != 0) && (JERRY_PROMISE_CALLBACK != 1))
+# error "Invalid value for 'JERRY_PROMISE_CALLBACK' macro."
 #endif
 #if !defined (JERRY_REGEXP_DUMP_BYTE_CODE) \
 || ((JERRY_REGEXP_DUMP_BYTE_CODE != 0) && (JERRY_REGEXP_DUMP_BYTE_CODE != 1))
@@ -691,25 +722,29 @@
 # error "Invalid value for 'JERRY_VM_EXEC_STOP' macro."
 #endif
 
-#define ENABLED(FEATURE) ((FEATURE) == 1)
-#define DISABLED(FEATURE) ((FEATURE) != 1)
-
 /**
  * Cross component requirements check.
  */
+
 /**
  * The date module can only use the float 64 number types.
- * Do a check for this.
  */
-#if ENABLED (JERRY_BUILTIN_DATE) && !ENABLED (JERRY_NUMBER_TYPE_FLOAT64)
+#if JERRY_BUILTIN_DATE && !JERRY_NUMBER_TYPE_FLOAT64
 #  error "Date does not support float32"
 #endif
 
 /**
+ * Promise support must be enabled if Promise callback support is enabled.
+ */
+#if JERRY_PROMISE_CALLBACK && !JERRY_BUILTIN_PROMISE
+#  error "Promise callback support depends on Promise support"
+#endif /* JERRY_PROMISE_CALLBACK && !JERRY_BUILTIN_PROMISE */
+
+/**
  * Wrap container types into a single guard
  */
-#if ENABLED (JERRY_BUILTIN_MAP) || ENABLED (JERRY_BUILTIN_SET) \
-|| ENABLED (JERRY_BUILTIN_WEAKMAP) || ENABLED (JERRY_BUILTIN_WEAKSET)
+#if JERRY_BUILTIN_MAP || JERRY_BUILTIN_SET \
+|| JERRY_BUILTIN_WEAKMAP || JERRY_BUILTIN_WEAKSET
 # define JERRY_BUILTIN_CONTAINER 1
 #else
 # define JERRY_BUILTIN_CONTAINER 0
@@ -718,7 +753,7 @@
 /**
  * Resource name related types into a single guard
  */
-#if ENABLED (JERRY_LINE_INFO) || ENABLED (JERRY_ERROR_MESSAGES) || ENABLED (JERRY_MODULE_SYSTEM)
+#if JERRY_LINE_INFO || JERRY_ERROR_MESSAGES || JERRY_MODULE_SYSTEM
 # define JERRY_RESOURCE_NAME 1
 #else
 # define JERRY_RESOURCE_NAME 0

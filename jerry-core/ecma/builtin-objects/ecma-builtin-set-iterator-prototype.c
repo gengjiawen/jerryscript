@@ -17,7 +17,7 @@
 #include "ecma-builtins.h"
 #include "ecma-container-object.h"
 
-#if ENABLED (JERRY_BUILTIN_SET)
+#if JERRY_BUILTIN_SET
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -51,7 +51,7 @@
 static ecma_value_t
 ecma_builtin_set_iterator_prototype_object_next (ecma_value_t this_val) /**< this argument */
 {
-  return ecma_op_container_iterator_next (this_val, ECMA_PSEUDO_SET_ITERATOR);
+  return ecma_op_container_iterator_next (this_val, ECMA_OBJECT_CLASS_SET_ITERATOR);
 } /* ecma_builtin_set_iterator_prototype_object_next */
 
 /**
@@ -60,4 +60,4 @@ ecma_builtin_set_iterator_prototype_object_next (ecma_value_t this_val) /**< thi
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_SET) */
+#endif /* JERRY_BUILTIN_SET */

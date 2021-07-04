@@ -24,7 +24,7 @@
 #include "ecma-string-object.h"
 #include "jrt.h"
 
-#if ENABLED (JERRY_BUILTIN_BOOLEAN)
+#if JERRY_BUILTIN_BOOLEAN
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -78,17 +78,17 @@ ecma_builtin_boolean_prototype_object_value_of (ecma_value_t this_arg) /**< this
   {
     ecma_object_t *object_p = ecma_get_object_from_value (this_arg);
 
-    if (ecma_object_class_is (object_p, LIT_MAGIC_STRING_BOOLEAN_UL))
+    if (ecma_object_class_is (object_p, ECMA_OBJECT_CLASS_BOOLEAN))
     {
       ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
 
-      JERRY_ASSERT (ecma_is_value_boolean (ext_object_p->u.class_prop.u.value));
+      JERRY_ASSERT (ecma_is_value_boolean (ext_object_p->u.cls.u3.value));
 
-      return ext_object_p->u.class_prop.u.value;
+      return ext_object_p->u.cls.u3.value;
     }
   }
 
-  return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a Boolean object."));
+  return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a Boolean object"));
 } /* ecma_builtin_boolean_prototype_object_value_of */
 
 /**
@@ -137,4 +137,4 @@ ecma_builtin_boolean_prototype_dispatch_routine (uint8_t builtin_routine_id, /**
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_BOOLEAN) */
+#endif /* JERRY_BUILTIN_BOOLEAN */

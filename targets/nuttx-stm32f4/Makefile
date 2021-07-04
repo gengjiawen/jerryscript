@@ -30,14 +30,14 @@ JERRYSCRIPT_ROOT_DIR ?= ../../../jerryscript
 CFLAGS += -std=c99
 CFLAGS += -I$(JERRYSCRIPT_ROOT_DIR)/jerry-core/include
 CFLAGS += -I$(JERRYSCRIPT_ROOT_DIR)/jerry-ext/include
-CFLAGS += -I$(JERRYSCRIPT_ROOT_DIR)/jerry-libm/include
+CFLAGS += -I$(JERRYSCRIPT_ROOT_DIR)/jerry-math/include
 
 # These libs should be copied from the JerryScript project.
-LIBS = libjerry-core.a libjerry-ext.a libjerry-libm.a
+LIBS = libjerry-core.a libjerry-ext.a libjerry-math.a
 
 APPNAME = jerry
 ASRCS = setjmp.S
-CSRCS = jerry_port.c
+CSRCS = jerry_port.c jerry_module.c
 MAINSRC = jerry_main.c
 
 .PHONY: copylibs

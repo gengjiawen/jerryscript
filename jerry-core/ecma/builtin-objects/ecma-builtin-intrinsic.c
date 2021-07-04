@@ -24,7 +24,7 @@
 #include "ecma-helpers.h"
 #include "lit-char-helpers.h"
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -116,7 +116,7 @@ ecma_builtin_intrinsic_map_prototype_entries (ecma_value_t this_value)
 
   return ecma_op_container_create_iterator (this_value,
                                             ECMA_BUILTIN_ID_MAP_ITERATOR_PROTOTYPE,
-                                            ECMA_PSEUDO_MAP_ITERATOR,
+                                            ECMA_OBJECT_CLASS_MAP_ITERATOR,
                                             ECMA_ITERATOR_ENTRIES);
 } /* ecma_builtin_intrinsic_map_prototype_entries */
 
@@ -142,7 +142,7 @@ ecma_builtin_intrinsic_set_prototype_values (ecma_value_t this_value)
 
   return ecma_op_container_create_iterator (this_value,
                                             ECMA_BUILTIN_ID_SET_ITERATOR_PROTOTYPE,
-                                            ECMA_PSEUDO_SET_ITERATOR,
+                                            ECMA_OBJECT_CLASS_SET_ITERATOR,
                                             ECMA_ITERATOR_VALUES);
 } /* ecma_builtin_intrinsic_set_prototype_values */
 
@@ -171,12 +171,12 @@ ecma_builtin_intrinsic_dispatch_routine (uint8_t builtin_routine_id, /**< built-
     {
       if (!ecma_is_typedarray (this_arg))
       {
-        return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a TypedArray."));
+        return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a TypedArray"));
       }
 
       if (ecma_arraybuffer_is_detached (ecma_typedarray_get_arraybuffer (ecma_get_object_from_value (this_arg))))
       {
-        return ecma_raise_type_error (ECMA_ERR_MSG ("ArrayBuffer has been detached."));
+        return ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_arraybuffer_is_detached));
       }
 
       return ecma_typedarray_iterators_helper (this_arg, ECMA_ITERATOR_VALUES);
@@ -205,21 +205,25 @@ ecma_builtin_intrinsic_dispatch_routine (uint8_t builtin_routine_id, /**< built-
     case ECMA_INTRINSIC_DATE_TO_UTC_STRING:
     {
       if (!ecma_is_value_object (this_arg)
-          || !ecma_object_class_is (ecma_get_object_from_value (this_arg), LIT_MAGIC_STRING_DATE_UL))
+          || !ecma_object_class_is (ecma_get_object_from_value (this_arg), ECMA_OBJECT_CLASS_DATE))
       {
-        return ecma_raise_type_error (ECMA_ERR_MSG ("'this' is not a Date object"));
+        return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a Date object"));
       }
 
-      ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) ecma_get_object_from_value (this_arg);
-      ecma_number_t *prim_value_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_number_t,
-                                                                     ext_object_p->u.class_prop.u.value);
+#if JERRY_ESNEXT
+      ecma_number_t *date_value_p = &((ecma_date_object_t *) ecma_get_object_from_value (this_arg))->date_value;
+#else /* !JERRY_ESNEXT */
+      ecma_extended_object_t *arg_ext_object_p = (ecma_extended_object_t *) ecma_get_object_from_value (argument);
+      ecma_number_t *date_value_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_number_t,
+                                                                     arg_ext_object_p->u.class_prop.u.date);
+#endif /* JERRY_ESNEXT */
 
-      if (ecma_number_is_nan (*prim_value_p))
+      if (ecma_number_is_nan (*date_value_p))
       {
         return ecma_make_magic_string_value (LIT_MAGIC_STRING_INVALID_DATE_UL);
       }
 
-      return ecma_date_value_to_utc_string (*prim_value_p);
+      return ecma_date_value_to_utc_string (*date_value_p);
     }
     case ECMA_INTRINSIC_STRING_TRIM_START:
     case ECMA_INTRINSIC_STRING_TRIM_END:
@@ -302,4 +306,4 @@ ecma_builtin_intrinsic_dispatch_routine (uint8_t builtin_routine_id, /**< built-
  * @}
  */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */

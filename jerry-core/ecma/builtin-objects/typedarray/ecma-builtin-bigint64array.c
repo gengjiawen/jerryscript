@@ -21,8 +21,8 @@
 #include "ecma-typedarray-object.h"
 #include "jrt.h"
 
-#if ENABLED (JERRY_BUILTIN_TYPEDARRAY)
-#if ENABLED (JERRY_BUILTIN_BIGINT)
+#if JERRY_BUILTIN_TYPEDARRAY
+#if JERRY_BUILTIN_BIGINT
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -54,7 +54,7 @@ ecma_builtin_bigint64array_dispatch_call (const ecma_value_t *arguments_list_p, 
 {
   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
 
-  return ecma_raise_type_error (ECMA_ERR_MSG ("BigInt64Array cannot be directly called"));
+  return ecma_raise_type_error (ECMA_ERR_MSG ("Constructor BigInt64Array requires 'new'"));
 } /* ecma_builtin_bigint64array_dispatch_call */
 
 /**
@@ -76,5 +76,5 @@ ecma_builtin_bigint64array_dispatch_construct (const ecma_value_t *arguments_lis
   * @}
   */
 
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
-#endif /* ENABLED (JERRY_BUILTIN_TYPEDARRAY) */
+#endif /* JERRY_BUILTIN_BIGINT */
+#endif /* JERRY_BUILTIN_TYPEDARRAY */

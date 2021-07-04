@@ -64,19 +64,19 @@
 
 #define CBC_HAS_POP_STACK_BYTE_ARG (CBC_HAS_BYTE_ARG | CBC_POP_STACK_BYTE_ARG)
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 /**
  * CBC_NO_RESULT_OPERATION for ext opcodes
  */
 #define CBC_EXT_NO_RESULT_OPERATION(opcode) \
-  ((opcode) >= PARSER_TO_EXT_OPCODE (CBC_EXT_SUPER_CALL) \
+  ((opcode) >= PARSER_TO_EXT_OPCODE (CBC_EXT_ASSIGN_SUPER) \
     && (opcode) <= PARSER_TO_EXT_OPCODE (CBC_EXT_SPREAD_CALL_PROP_BLOCK))
-#else /* !ENABLED (JERRY_ESNEXT) */
+#else /* !JERRY_ESNEXT */
 /**
  * CBC_NO_RESULT_OPERATION for ext opcodes
  */
 #define CBC_EXT_NO_RESULT_OPERATION(opcode) false
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /* Debug macro. */
 #define CBC_ARGS_EQ(op, types) \
@@ -202,6 +202,12 @@
 #define PARSER_WITH_CONTEXT_STACK_ALLOCATION 1
 /* PARSER_BLOCK_CONTEXT_STACK_ALLOCATION must be <= 3 */
 #define PARSER_BLOCK_CONTEXT_STACK_ALLOCATION 1
+/* PARSER_ITERATOR_CONTEXT_STACK_ALLOCATION must be <= 3 */
+#define PARSER_ITERATOR_CONTEXT_STACK_ALLOCATION 3
+/* PARSER_OBJECT_INITIALIZER_CONTEXT_STACK_ALLOCATION must be <= 2 */
+#define PARSER_OBJ_INIT_CONTEXT_STACK_ALLOCATION 1
+/* PARSER_OBJECT_INITIALIZER_CONTEXT_STACK_ALLOCATION must be <= 2 */
+#define PARSER_OBJ_INIT_REST_CONTEXT_STACK_ALLOCATION 2
 
 /**
  * Extra stack consumption for finally context.
@@ -282,6 +288,12 @@
               VM_OC_PUSH_POS_BYTE | VM_OC_PUT_STACK) \
   CBC_OPCODE (CBC_PUSH_NUMBER_NEG_BYTE, CBC_HAS_BYTE_ARG, 1, \
               VM_OC_PUSH_NEG_BYTE | VM_OC_PUT_STACK) \
+  CBC_OPCODE (CBC_PUSH_LITERAL_PUSH_NUMBER_0, CBC_HAS_LITERAL_ARG, 2, \
+              VM_OC_PUSH_LIT_0 | VM_OC_GET_LITERAL) \
+  CBC_OPCODE (CBC_PUSH_LITERAL_PUSH_NUMBER_POS_BYTE, CBC_HAS_LITERAL_ARG | CBC_HAS_BYTE_ARG, 2, \
+              VM_OC_PUSH_LIT_POS_BYTE | VM_OC_GET_LITERAL) \
+  CBC_OPCODE (CBC_PUSH_LITERAL_PUSH_NUMBER_NEG_BYTE, CBC_HAS_LITERAL_ARG | CBC_HAS_BYTE_ARG, 2, \
+              VM_OC_PUSH_LIT_NEG_BYTE | VM_OC_GET_LITERAL) \
   /* Note: These 4 opcodes must me in this order */ \
   CBC_OPCODE (CBC_PUSH_PROP, CBC_NO_FLAG, -1, \
               VM_OC_PROP_GET | VM_OC_GET_STACK_STACK | VM_OC_PUT_STACK) \
@@ -516,12 +528,6 @@
               VM_OC_ASSIGN_LET_CONST | VM_OC_GET_STACK) \
   CBC_OPCODE (CBC_ASSIGN_LET_CONST_LITERAL, CBC_HAS_LITERAL_ARG | CBC_HAS_LITERAL_ARG2, 0, \
               VM_OC_ASSIGN_LET_CONST | VM_OC_GET_LITERAL) \
-  CBC_OPCODE (CBC_ASSIGN_SUPER, CBC_NO_FLAG, -3, \
-              VM_OC_ASSIGN_SUPER) \
-  CBC_OPCODE (CBC_ASSIGN_SUPER_PUSH_RESULT, CBC_NO_FLAG, -2, \
-              VM_OC_ASSIGN_SUPER | VM_OC_PUT_STACK) \
-  CBC_OPCODE (CBC_ASSIGN_SUPER_BLOCK, CBC_NO_FLAG, -3, \
-              VM_OC_ASSIGN_SUPER | VM_OC_PUT_BLOCK) \
   \
   /* Last opcode (not a real opcode). */ \
   CBC_OPCODE (CBC_END, CBC_NO_FLAG, 0, \
@@ -573,7 +579,7 @@
   CBC_FORWARD_BRANCH (CBC_EXT_FINALLY, PARSER_FINALLY_CONTEXT_EXTRA_STACK_ALLOCATION, \
                       VM_OC_FINALLY) \
   CBC_OPCODE (CBC_EXT_INITIALIZER_PUSH_PROP, CBC_NO_FLAG, 0, \
-              VM_OC_INITIALIZER_PUSH_PROP | VM_OC_GET_STACK) \
+              VM_OC_INITIALIZER_PUSH_PROP) \
   CBC_FORWARD_BRANCH (CBC_EXT_DEFAULT_INITIALIZER, -1, \
                       VM_OC_DEFAULT_INITIALIZER) \
   CBC_OPCODE (CBC_EXT_ERROR, CBC_NO_FLAG, 0, \
@@ -584,12 +590,6 @@
   /* Basic opcodes. */ \
   CBC_OPCODE (CBC_EXT_CREATE_ARGUMENTS, CBC_HAS_LITERAL_ARG, 0, \
               VM_OC_CREATE_ARGUMENTS) \
-  CBC_OPCODE (CBC_EXT_PUSH_LITERAL_PUSH_NUMBER_0, CBC_HAS_LITERAL_ARG, 2, \
-              VM_OC_PUSH_LIT_0 | VM_OC_GET_LITERAL) \
-  CBC_OPCODE (CBC_EXT_PUSH_LITERAL_PUSH_NUMBER_POS_BYTE, CBC_HAS_LITERAL_ARG | CBC_HAS_BYTE_ARG, 2, \
-              VM_OC_PUSH_LIT_POS_BYTE | VM_OC_GET_LITERAL) \
-  CBC_OPCODE (CBC_EXT_PUSH_LITERAL_PUSH_NUMBER_NEG_BYTE, CBC_HAS_LITERAL_ARG | CBC_HAS_BYTE_ARG, 2, \
-              VM_OC_PUSH_LIT_NEG_BYTE | VM_OC_GET_LITERAL) \
   CBC_OPCODE (CBC_EXT_CREATE_VAR_EVAL, CBC_HAS_LITERAL_ARG, 0, \
               VM_OC_EXT_VAR_EVAL) \
   CBC_OPCODE (CBC_EXT_CREATE_VAR_FUNC_EVAL, CBC_HAS_LITERAL_ARG | CBC_HAS_LITERAL_ARG2, 0, \
@@ -610,8 +610,6 @@
               VM_OC_LINE) \
   CBC_OPCODE (CBC_EXT_THROW_REFERENCE_ERROR, CBC_NO_FLAG, 1, \
               VM_OC_THROW_REFERENCE_ERROR) \
-  CBC_OPCODE (CBC_EXT_THROW_SYNTAX_ERROR, CBC_HAS_LITERAL_ARG, 1, \
-              VM_OC_THROW_SYNTAX_ERROR | VM_OC_GET_LITERAL) \
   CBC_OPCODE (CBC_EXT_THROW_ASSIGN_CONST_ERROR, CBC_NO_FLAG, 0, \
               VM_OC_THROW_CONST_ERROR) \
   CBC_OPCODE (CBC_EXT_REQUIRE_OBJECT_COERCIBLE, CBC_NO_FLAG, 0, \
@@ -712,6 +710,12 @@
               VM_OC_RESOLVE_LEXICAL_THIS | VM_OC_PUT_STACK) \
   CBC_OPCODE (CBC_EXT_LOCAL_EVAL, CBC_HAS_BYTE_ARG, 0, \
               VM_OC_LOCAL_EVAL) \
+  CBC_OPCODE (CBC_EXT_ASSIGN_SUPER, CBC_NO_FLAG, -3, \
+              VM_OC_ASSIGN_SUPER) \
+  CBC_OPCODE (CBC_EXT_ASSIGN_SUPER_PUSH_RESULT, CBC_NO_FLAG, -2, \
+              VM_OC_ASSIGN_SUPER | VM_OC_PUT_STACK) \
+  CBC_OPCODE (CBC_EXT_ASSIGN_SUPER_BLOCK, CBC_NO_FLAG, -3, \
+              VM_OC_ASSIGN_SUPER | VM_OC_PUT_BLOCK) \
   CBC_OPCODE (CBC_EXT_SUPER_CALL, CBC_HAS_POP_STACK_BYTE_ARG, -1, \
               VM_OC_SUPER_CALL) \
   CBC_OPCODE (CBC_EXT_SUPER_CALL_PUSH_RESULT, CBC_HAS_POP_STACK_BYTE_ARG, 0, \
@@ -748,26 +752,24 @@
               VM_OC_INITIALIZER_PUSH_PROP | VM_OC_GET_LITERAL) \
   CBC_OPCODE (CBC_EXT_SPREAD_NEW, CBC_HAS_POP_STACK_BYTE_ARG, 0, \
               VM_OC_SPREAD_ARGUMENTS | VM_OC_PUT_STACK) \
-  CBC_OPCODE (CBC_EXT_MOVE, CBC_NO_FLAG, 0, \
-              VM_OC_MOVE) \
-  CBC_OPCODE (CBC_EXT_MOVE_2, CBC_NO_FLAG, 0, \
-              VM_OC_MOVE) \
-  CBC_OPCODE (CBC_EXT_MOVE_3, CBC_NO_FLAG, 0, \
-              VM_OC_MOVE) \
   \
   /* Iterator related opcodes. */ \
-  CBC_OPCODE (CBC_EXT_GET_ITERATOR, CBC_NO_FLAG, 1, \
-              VM_OC_GET_ITERATOR) \
+  CBC_OPCODE (CBC_EXT_ITERATOR_CONTEXT_CREATE, CBC_NO_FLAG, PARSER_ITERATOR_CONTEXT_STACK_ALLOCATION, \
+              VM_OC_ITERATOR_CONTEXT_CREATE) \
+  CBC_OPCODE (CBC_EXT_ITERATOR_CONTEXT_END, CBC_NO_FLAG, -PARSER_ITERATOR_CONTEXT_STACK_ALLOCATION, \
+              VM_OC_ITERATOR_CONTEXT_END) \
   CBC_OPCODE (CBC_EXT_ITERATOR_STEP, CBC_NO_FLAG, 1, \
               VM_OC_ITERATOR_STEP) \
-  CBC_OPCODE (CBC_EXT_ITERATOR_CLOSE, CBC_NO_FLAG, -1, \
-              VM_OC_ITERATOR_CLOSE | VM_OC_GET_STACK) \
   \
   /* Object initializer related opcodes. */ \
-  CBC_OPCODE (CBC_EXT_INITIALIZER_PUSH_LIST, CBC_NO_FLAG, 1, \
-              VM_OC_INITIALIZER_PUSH_LIST) \
-  CBC_OPCODE (CBC_EXT_INITIALIZER_PUSH_REST, CBC_NO_FLAG, 0, \
-              VM_OC_INITIALIZER_PUSH_REST) \
+  CBC_OPCODE (CBC_EXT_OBJ_INIT_CONTEXT_CREATE, CBC_NO_FLAG, PARSER_OBJ_INIT_CONTEXT_STACK_ALLOCATION, \
+              VM_OC_OBJ_INIT_CONTEXT_CREATE) \
+  CBC_OPCODE (CBC_EXT_OBJ_INIT_REST_CONTEXT_CREATE, CBC_NO_FLAG, PARSER_OBJ_INIT_REST_CONTEXT_STACK_ALLOCATION, \
+              VM_OC_OBJ_INIT_CONTEXT_CREATE) \
+  CBC_OPCODE (CBC_EXT_OBJ_INIT_PUSH_REST, CBC_NO_FLAG, 1, \
+              VM_OC_OBJ_INIT_PUSH_REST) \
+  CBC_OPCODE (CBC_EXT_OBJ_INIT_CONTEXT_END, CBC_NO_FLAG, -PARSER_OBJ_INIT_CONTEXT_STACK_ALLOCATION, \
+              VM_OC_OBJ_INIT_CONTEXT_END) \
   CBC_OPCODE (CBC_EXT_INITIALIZER_PUSH_NAME, CBC_NO_FLAG, 0, \
               VM_OC_INITIALIZER_PUSH_NAME | VM_OC_GET_STACK) \
   CBC_OPCODE (CBC_EXT_INITIALIZER_PUSH_NAME_LITERAL, CBC_HAS_LITERAL_ARG, 1, \
@@ -852,9 +854,9 @@ typedef struct
   uint8_t ident_end;                /**< end position of the identifier group */
   uint8_t const_literal_end;        /**< end position of the const literal group */
   uint8_t literal_end;              /**< end position of the literal group */
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
   ecma_value_t realm_value;         /**< realm value */
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_BUILTIN_REALMS */
 } cbc_uint8_arguments_t;
 
 /**
@@ -870,9 +872,9 @@ typedef struct
   uint16_t const_literal_end;       /**< end position of the const literal group */
   uint16_t literal_end;             /**< end position of the literal group */
   uint16_t padding;                 /**< an unused value */
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
   ecma_value_t realm_value;         /**< realm value */
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_BUILTIN_REALMS */
 } cbc_uint16_arguments_t;
 
 /**
@@ -909,11 +911,11 @@ typedef enum
   /* The following functions cannot be constructed (see CBC_FUNCTION_IS_CONSTRUCTABLE) */
   CBC_FUNCTION_SCRIPT, /**< script (global) function */
   CBC_FUNCTION_GENERATOR, /**< generator function */
-  CBC_FUNCTION_ASYNC, /**< async function */
   CBC_FUNCTION_ASYNC_GENERATOR, /**< async generator function */
 
   /* The following functions has no prototype (see CBC_FUNCTION_HAS_PROTOTYPE) */
   CBC_FUNCTION_ACCESSOR, /**< property accessor function */
+  CBC_FUNCTION_ASYNC, /**< async function */
   CBC_FUNCTION_METHOD, /**< method */
 
   /* The following functions are arrow function (see CBC_FUNCTION_IS_ARROW) */
@@ -993,7 +995,7 @@ typedef enum
 extern const uint8_t cbc_flags[];
 extern const uint8_t cbc_ext_flags[];
 
-#if ENABLED (JERRY_PARSER_DUMP_BYTE_CODE)
+#if JERRY_PARSER_DUMP_BYTE_CODE
 
 /**
  * Opcode names for debugging.
@@ -1001,7 +1003,7 @@ extern const uint8_t cbc_ext_flags[];
 extern const char * const cbc_names[];
 extern const char * const cbc_ext_names[];
 
-#endif /* ENABLED (JERRY_PARSER_DUMP_BYTE_CODE) */
+#endif /* JERRY_PARSER_DUMP_BYTE_CODE */
 
 /**
  * @}

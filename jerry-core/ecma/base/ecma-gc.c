@@ -25,6 +25,7 @@
 #include "ecma-globals.h"
 #include "ecma-gc.h"
 #include "ecma-helpers.h"
+#include "ecma-lcache.h"
 #include "ecma-objects.h"
 #include "ecma-property-hashmap.h"
 #include "ecma-proxy-object.h"
@@ -36,12 +37,12 @@
 #include "vm-defines.h"
 #include "vm-stack.h"
 
-#if ENABLED (JERRY_BUILTIN_TYPEDARRAY)
+#if JERRY_BUILTIN_TYPEDARRAY
 #include "ecma-typedarray-object.h"
-#endif /* ENABLED (JERRY_BUILTIN_TYPEDARRAY) */
-#if ENABLED (JERRY_BUILTIN_PROMISE)
+#endif /* JERRY_BUILTIN_TYPEDARRAY */
+#if JERRY_BUILTIN_PROMISE
 #include "ecma-promise-object.h"
-#endif /* ENABLED (JERRY_BUILTIN_PROMISE) */
+#endif /* JERRY_BUILTIN_PROMISE */
 
 /* TODO: Extract GC to a separate component */
 
@@ -90,19 +91,19 @@ ecma_gc_set_object_visited (ecma_object_t *object_p) /**< object */
     {
       JERRY_CONTEXT (ecma_gc_mark_recursion_limit)--;
       /* Set the reference count of gray object to 0 */
-      object_p->type_flags_refs = (uint16_t) (object_p->type_flags_refs & (ECMA_OBJECT_REF_ONE - 1));
+      object_p->type_flags_refs &= (ecma_object_descriptor_t) (ECMA_OBJECT_REF_ONE - 1);
       ecma_gc_mark (object_p);
       JERRY_CONTEXT (ecma_gc_mark_recursion_limit)++;
     }
     else
     {
       /* Set the reference count of the non-marked gray object to 1 */
-      object_p->type_flags_refs = (uint16_t) (object_p->type_flags_refs & ((ECMA_OBJECT_REF_ONE << 1) - 1));
+      object_p->type_flags_refs &= (ecma_object_descriptor_t) ((ECMA_OBJECT_REF_ONE << 1) - 1);
       JERRY_ASSERT (object_p->type_flags_refs >= ECMA_OBJECT_REF_ONE);
     }
 #else /* (JERRY_GC_MARK_LIMIT == 0) */
     /* Set the reference count of gray object to 0 */
-    object_p->type_flags_refs = (uint16_t) (object_p->type_flags_refs & (ECMA_OBJECT_REF_ONE - 1));
+    object_p->type_flags_refs &= (ecma_object_descriptor_t) (ECMA_OBJECT_REF_ONE - 1);
 #endif /* (JERRY_GC_MARK_LIMIT != 0) */
   }
 } /* ecma_gc_set_object_visited */
@@ -110,14 +111,14 @@ ecma_gc_set_object_visited (ecma_object_t *object_p) /**< object */
 /**
  * Initialize GC information for the object
  */
-inline void
+extern inline void
 ecma_init_gc_info (ecma_object_t *object_p) /**< object */
 {
   JERRY_CONTEXT (ecma_gc_objects_number)++;
   JERRY_CONTEXT (ecma_gc_new_objects)++;
 
   JERRY_ASSERT (object_p->type_flags_refs < ECMA_OBJECT_REF_ONE);
-  object_p->type_flags_refs = (uint16_t) (object_p->type_flags_refs | ECMA_OBJECT_REF_ONE);
+  object_p->type_flags_refs |= ECMA_OBJECT_REF_ONE;
 
   object_p->gc_next_cp = JERRY_CONTEXT (ecma_gc_objects_cp);
   ECMA_SET_NON_NULL_POINTER (JERRY_CONTEXT (ecma_gc_objects_cp), object_p);
@@ -126,27 +127,36 @@ ecma_init_gc_info (ecma_object_t *object_p) /**< object */
 /**
  * Increase reference counter of an object
  */
-void
-ecma_ref_object (ecma_object_t *object_p) /**< object */
+extern inline void JERRY_ATTR_ALWAYS_INLINE
+ecma_ref_object_inline (ecma_object_t *object_p) /**< object */
 {
   if (JERRY_LIKELY (object_p->type_flags_refs < ECMA_OBJECT_MAX_REF))
   {
-    object_p->type_flags_refs = (uint16_t) (object_p->type_flags_refs + ECMA_OBJECT_REF_ONE);
+    object_p->type_flags_refs = (ecma_object_descriptor_t) (object_p->type_flags_refs + ECMA_OBJECT_REF_ONE);
   }
   else
   {
     jerry_fatal (ERR_REF_COUNT_LIMIT);
   }
+} /* ecma_ref_object_inline */
+
+/**
+ * Increase reference counter of an object
+ */
+void
+ecma_ref_object (ecma_object_t *object_p) /**< object */
+{
+  ecma_ref_object_inline (object_p);
 } /* ecma_ref_object */
 
 /**
  * Decrease reference counter of an object
  */
-inline void JERRY_ATTR_ALWAYS_INLINE
+extern inline void JERRY_ATTR_ALWAYS_INLINE
 ecma_deref_object (ecma_object_t *object_p) /**< object */
 {
   JERRY_ASSERT (object_p->type_flags_refs >= ECMA_OBJECT_REF_ONE);
-  object_p->type_flags_refs = (uint16_t) (object_p->type_flags_refs - ECMA_OBJECT_REF_ONE);
+  object_p->type_flags_refs = (ecma_object_descriptor_t) (object_p->type_flags_refs - ECMA_OBJECT_REF_ONE);
 } /* ecma_deref_object */
 
 /**
@@ -159,12 +169,16 @@ ecma_gc_mark_global_object (ecma_global_object_t *global_object_p) /**< global o
 
   ecma_gc_set_object_visited (ECMA_GET_NON_NULL_POINTER (ecma_object_t, global_object_p->global_env_cp));
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_BUILTIN_REALMS
+  ecma_gc_set_object_visited (ecma_get_object_from_value (global_object_p->this_binding));
+#endif /* JERRY_BUILTIN_REALMS */
+
+#if JERRY_ESNEXT
   if (global_object_p->global_scope_cp != global_object_p->global_env_cp)
   {
     ecma_gc_set_object_visited (ECMA_GET_NON_NULL_POINTER (ecma_object_t, global_object_p->global_scope_cp));
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   jmem_cpointer_t *builtin_objects_p = global_object_p->builtin_objects;
 
@@ -183,14 +197,14 @@ ecma_gc_mark_global_object (ecma_global_object_t *global_object_p) /**< global o
 static void
 ecma_gc_mark_arguments_object (ecma_extended_object_t *ext_object_p) /**< arguments object */
 {
-  JERRY_ASSERT (ecma_get_object_type ((ecma_object_t *) ext_object_p) == ECMA_OBJECT_TYPE_PSEUDO_ARRAY);
+  JERRY_ASSERT (ecma_get_object_type ((ecma_object_t *) ext_object_p) == ECMA_OBJECT_TYPE_CLASS);
 
   ecma_unmapped_arguments_t *arguments_p = (ecma_unmapped_arguments_t *) ext_object_p;
   ecma_gc_set_object_visited (ecma_get_object_from_value (arguments_p->callee));
 
   ecma_value_t *argv_p = (ecma_value_t *) (arguments_p + 1);
 
-  if (ext_object_p->u.pseudo_array.extra_info & ECMA_ARGUMENTS_OBJECT_MAPPED)
+  if (ext_object_p->u.cls.u1.arguments_flags & ECMA_ARGUMENTS_OBJECT_MAPPED)
   {
     ecma_mapped_arguments_t *mapped_arguments_p = (ecma_mapped_arguments_t *) ext_object_p;
     argv_p = (ecma_value_t *) (mapped_arguments_p + 1);
@@ -198,7 +212,7 @@ ecma_gc_mark_arguments_object (ecma_extended_object_t *ext_object_p) /**< argume
     ecma_gc_set_object_visited (ECMA_GET_INTERNAL_VALUE_POINTER (ecma_object_t, mapped_arguments_p->lex_env));
   }
 
-  uint32_t arguments_number = arguments_p->header.u.pseudo_array.u2.arguments_number;
+  uint32_t arguments_number = arguments_p->header.u.cls.u3.arguments_number;
 
   for (uint32_t i = 0; i < arguments_number; i++)
   {
@@ -212,27 +226,60 @@ ecma_gc_mark_arguments_object (ecma_extended_object_t *ext_object_p) /**< argume
 /**
  * Mark referenced object from property
  */
-static inline void JERRY_ATTR_ALWAYS_INLINE
-ecma_gc_mark_properties (ecma_property_pair_t *property_pair_p) /**< property pair */
+static void
+ecma_gc_mark_properties (ecma_object_t *object_p, /**< object */
+                         bool mark_references) /**< mark references */
 {
-  for (uint32_t index = 0; index < ECMA_PROPERTY_PAIR_ITEM_COUNT; index++)
+  JERRY_UNUSED (mark_references);
+
+#if !JERRY_MODULE_SYSTEM
+  JERRY_ASSERT (!mark_references);
+#endif /* !JERRY_MODULE_SYSTEM */
+
+  jmem_cpointer_t prop_iter_cp = object_p->u1.property_list_cp;
+
+#if JERRY_PROPERTY_HASHMAP
+  if (prop_iter_cp != JMEM_CP_NULL)
   {
-    uint8_t property = property_pair_p->header.types[index];
-
-    switch (ECMA_PROPERTY_GET_TYPE (property))
+    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
+    if (prop_iter_p->types[0] == ECMA_PROPERTY_TYPE_HASHMAP)
     {
-      case ECMA_PROPERTY_TYPE_NAMEDDATA:
-      {
-        ecma_value_t value = property_pair_p->values[index].value;
+      prop_iter_cp = prop_iter_p->next_property_cp;
+    }
+  }
+#endif /* JERRY_PROPERTY_HASHMAP */
 
-        if (ecma_is_value_object (value))
-        {
-          ecma_gc_set_object_visited (ecma_get_object_from_value (value));
-        }
-        break;
-      }
-      case ECMA_PROPERTY_TYPE_NAMEDACCESSOR:
+  while (prop_iter_cp != JMEM_CP_NULL)
+  {
+    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
+    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY_PAIR (prop_iter_p));
+
+    ecma_property_pair_t *property_pair_p = (ecma_property_pair_t *) prop_iter_p;
+
+    for (uint32_t index = 0; index < ECMA_PROPERTY_PAIR_ITEM_COUNT; index++)
+    {
+      uint8_t property = property_pair_p->header.types[index];
+
+      if (JERRY_LIKELY (ECMA_PROPERTY_IS_RAW (property)))
       {
+        if (property & ECMA_PROPERTY_FLAG_DATA)
+        {
+          ecma_value_t value = property_pair_p->values[index].value;
+
+          if (ecma_is_value_object (value))
+          {
+            ecma_gc_set_object_visited (ecma_get_object_from_value (value));
+          }
+          continue;
+        }
+
+#if JERRY_MODULE_SYSTEM
+        if (mark_references)
+        {
+          continue;
+        }
+#endif /* JERRY_MODULE_SYSTEM */
+
         ecma_property_value_t *accessor_objs_p = property_pair_p->values + index;
 
         ecma_getter_setter_pointers_t *get_set_pair_p = ecma_get_named_accessor_property (accessor_objs_p);
@@ -246,16 +293,24 @@ ecma_gc_mark_properties (ecma_property_pair_t *property_pair_p) /**< property pa
         {
           ecma_gc_set_object_visited (ECMA_GET_NON_NULL_POINTER (ecma_object_t, get_set_pair_p->setter_cp));
         }
-        break;
-      }
-      case ECMA_PROPERTY_TYPE_INTERNAL:
-      {
-        JERRY_ASSERT (ECMA_PROPERTY_GET_NAME_TYPE (property) == ECMA_DIRECT_STRING_MAGIC
-                      && property_pair_p->names_cp[index] >= LIT_INTERNAL_MAGIC_STRING_FIRST_DATA
-                      && property_pair_p->names_cp[index] < LIT_MAGIC_STRING__COUNT);
 
-#if ENABLED (JERRY_ESNEXT)
-        if (property_pair_p->names_cp[index] == LIT_INTERNAL_MAGIC_STRING_ENVIRONMENT_RECORD)
+        continue;
+      }
+
+      if (!ECMA_PROPERTY_IS_INTERNAL (property))
+      {
+        JERRY_ASSERT (property == ECMA_PROPERTY_TYPE_DELETED
+                      || property == ECMA_PROPERTY_TYPE_HASHMAP);
+        continue;
+      }
+
+      JERRY_ASSERT (property_pair_p->names_cp[index] >= LIT_INTERNAL_MAGIC_STRING_FIRST_DATA
+                    && property_pair_p->names_cp[index] < LIT_MAGIC_STRING__COUNT);
+
+      switch (property_pair_p->names_cp[index])
+      {
+#if JERRY_ESNEXT
+        case LIT_INTERNAL_MAGIC_STRING_ENVIRONMENT_RECORD:
         {
           ecma_environment_record_t *environment_record_p;
           environment_record_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_environment_record_t,
@@ -269,19 +324,96 @@ ecma_gc_mark_properties (ecma_property_pair_t *property_pair_p) /**< property pa
 
           JERRY_ASSERT (ecma_is_value_object (environment_record_p->function_object));
           ecma_gc_set_object_visited (ecma_get_object_from_value (environment_record_p->function_object));
+          break;
         }
-#endif /* ENABLED (JERRY_ESNEXT) */
-        break;
-      }
-      default:
-      {
-        JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (property) == ECMA_PROPERTY_TYPE_SPECIAL);
+#endif /* JERRY_ESNEXT */
+#if JERRY_BUILTIN_WEAKMAP
+        case LIT_INTERNAL_MAGIC_STRING_WEAK_REFS:
+        {
+          ecma_value_t key_arg = ecma_make_object_value (object_p);
+          ecma_collection_t *refs_p;
 
-        JERRY_ASSERT (property == ECMA_PROPERTY_TYPE_HASHMAP
-                      || property == ECMA_PROPERTY_TYPE_DELETED);
-        break;
+          refs_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t, property_pair_p->values[index].value);
+
+          for (uint32_t j = 0; j < refs_p->item_count; j++)
+          {
+            const ecma_value_t reference_value = refs_p->buffer_p[j];
+
+            if (ecma_is_value_empty (reference_value))
+            {
+              continue;
+            }
+
+            ecma_object_t *reference_object_p = ecma_get_object_from_value (reference_value);
+
+            JERRY_ASSERT (ecma_get_object_type (reference_object_p) == ECMA_OBJECT_TYPE_CLASS);
+
+            ecma_extended_object_t *map_object_p = (ecma_extended_object_t *) reference_object_p;
+
+            if (map_object_p->u.cls.type != ECMA_OBJECT_CLASS_CONTAINER
+                || map_object_p->u.cls.u2.container_id != LIT_MAGIC_STRING_WEAKMAP_UL
+                || !ecma_gc_is_object_visited (reference_object_p))
+            {
+              continue;
+            }
+
+            ecma_value_t value = ecma_op_container_find_weak_value (reference_object_p, key_arg);
+
+            if (ecma_is_value_object (value))
+            {
+              ecma_gc_set_object_visited (ecma_get_object_from_value (value));
+            }
+          }
+          break;
+        }
+#endif /* JERRY_BUILTIN_WEAKMAP */
+        case LIT_INTERNAL_MAGIC_STRING_NATIVE_POINTER_WITH_REFERENCES:
+        {
+          jerry_value_t value = property_pair_p->values[index].value;
+
+          if (value == JMEM_CP_NULL)
+          {
+            JERRY_ASSERT (!(property & ECMA_PROPERTY_FLAG_SINGLE_EXTERNAL));
+            break;
+          }
+
+          ecma_native_pointer_t *item_p;
+          item_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_native_pointer_t, value);
+
+          do
+          {
+            jerry_object_native_info_t *native_info_p = item_p->native_info_p;
+
+            JERRY_ASSERT (native_info_p != NULL && native_info_p->number_of_references > 0);
+
+            uint8_t *start_p = ((uint8_t *) item_p->native_p) + native_info_p->offset_of_references;
+            ecma_value_t *value_p = (ecma_value_t *) start_p;
+            ecma_value_t *end_p = value_p + native_info_p->number_of_references;
+
+            do
+            {
+              if (ecma_is_value_object (*value_p))
+              {
+                ecma_gc_set_object_visited (ecma_get_object_from_value (*value_p));
+              }
+            }
+            while (++value_p < end_p);
+
+            if (property & ECMA_PROPERTY_FLAG_SINGLE_EXTERNAL)
+            {
+              break;
+            }
+
+            item_p = &(((ecma_native_pointer_chain_t *) item_p)->next_p->data);
+          }
+          while (item_p != NULL);
+
+          break;
+        }
       }
     }
+
+    prop_iter_cp = prop_iter_p->next_property_cp;
   }
 } /* ecma_gc_mark_properties */
 
@@ -327,7 +459,7 @@ ecma_gc_mark_bound_function_object (ecma_object_t *object_p) /**< bound function
   }
 } /* ecma_gc_mark_bound_function_object */
 
-#if ENABLED (JERRY_BUILTIN_PROMISE)
+#if JERRY_BUILTIN_PROMISE
 /**
  * Mark objects referenced by Promise built-in.
  */
@@ -335,7 +467,7 @@ static void
 ecma_gc_mark_promise_object (ecma_extended_object_t *ext_object_p) /**< extended object */
 {
   /* Mark promise result. */
-  ecma_value_t result = ext_object_p->u.class_prop.u.value;
+  ecma_value_t result = ext_object_p->u.cls.u3.value;
 
   if (ecma_is_value_object (result))
   {
@@ -344,14 +476,6 @@ ecma_gc_mark_promise_object (ecma_extended_object_t *ext_object_p) /**< extended
 
   /* Mark all reactions. */
   ecma_promise_object_t *promise_object_p = (ecma_promise_object_t *) ext_object_p;
-
-  if (!ecma_is_value_empty (promise_object_p->resolve))
-  {
-    JERRY_ASSERT (ecma_is_value_object (promise_object_p->resolve)
-                  && ecma_is_value_object (promise_object_p->reject));
-    ecma_gc_set_object_visited (ecma_get_object_from_value (promise_object_p->resolve));
-    ecma_gc_set_object_visited (ecma_get_object_from_value (promise_object_p->reject));
-  }
 
   ecma_collection_t *collection_p = promise_object_p->reactions;
 
@@ -379,9 +503,9 @@ ecma_gc_mark_promise_object (ecma_extended_object_t *ext_object_p) /**< extended
   }
 } /* ecma_gc_mark_promise_object */
 
-#endif /* ENABLED (JERRY_BUILTIN_PROMISE) */
+#endif /* JERRY_BUILTIN_PROMISE */
 
-#if ENABLED (JERRY_BUILTIN_MAP)
+#if JERRY_BUILTIN_MAP
 /**
  * Mark objects referenced by Map built-in.
  */
@@ -392,7 +516,7 @@ ecma_gc_mark_map_object (ecma_object_t *object_p) /**< object */
 
   ecma_extended_object_t *map_object_p = (ecma_extended_object_t *) object_p;
   ecma_collection_t *container_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t,
-                                                                    map_object_p->u.class_prop.u.value);
+                                                                    map_object_p->u.cls.u3.value);
   ecma_value_t *start_p = ECMA_CONTAINER_START (container_p);
   uint32_t entry_count = ECMA_CONTAINER_ENTRY_COUNT (container_p);
 
@@ -416,9 +540,9 @@ ecma_gc_mark_map_object (ecma_object_t *object_p) /**< object */
     }
   }
 } /* ecma_gc_mark_map_object */
-#endif /* ENABLED (JERRY_BUILTIN_MAP) */
+#endif /* JERRY_BUILTIN_MAP */
 
-#if ENABLED (JERRY_BUILTIN_WEAKMAP)
+#if JERRY_BUILTIN_WEAKMAP
 /**
  * Mark objects referenced by WeakMap built-in.
  */
@@ -429,7 +553,7 @@ ecma_gc_mark_weakmap_object (ecma_object_t *object_p) /**< object */
 
   ecma_extended_object_t *map_object_p = (ecma_extended_object_t *) object_p;
   ecma_collection_t *container_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t,
-                                                                    map_object_p->u.class_prop.u.value);
+                                                                    map_object_p->u.cls.u3.value);
   ecma_value_t *start_p = ECMA_CONTAINER_START (container_p);
   uint32_t entry_count = ECMA_CONTAINER_ENTRY_COUNT (container_p);
 
@@ -442,15 +566,18 @@ ecma_gc_mark_weakmap_object (ecma_object_t *object_p) /**< object */
       continue;
     }
 
-    if (ecma_is_value_object (entry_p->value))
+    JERRY_ASSERT (ecma_is_value_object (entry_p->key));
+
+    if (ecma_is_value_object (entry_p->value)
+        && ecma_gc_is_object_visited (ecma_get_object_from_value (entry_p->key)))
     {
       ecma_gc_set_object_visited (ecma_get_object_from_value (entry_p->value));
     }
   }
 } /* ecma_gc_mark_weakmap_object */
-#endif /* ENABLED (JERRY_BUILTIN_WEAKMAP) */
+#endif /* JERRY_BUILTIN_WEAKMAP */
 
-#if ENABLED (JERRY_BUILTIN_SET)
+#if JERRY_BUILTIN_SET
 /**
  * Mark objects referenced by Set built-in.
  */
@@ -461,7 +588,7 @@ ecma_gc_mark_set_object (ecma_object_t *object_p) /**< object */
 
   ecma_extended_object_t *map_object_p = (ecma_extended_object_t *) object_p;
   ecma_collection_t *container_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t,
-                                                                    map_object_p->u.class_prop.u.value);
+                                                                    map_object_p->u.cls.u3.value);
   ecma_value_t *start_p = ECMA_CONTAINER_START (container_p);
   uint32_t entry_count = ECMA_CONTAINER_ENTRY_COUNT (container_p);
 
@@ -480,9 +607,9 @@ ecma_gc_mark_set_object (ecma_object_t *object_p) /**< object */
     }
   }
 } /* ecma_gc_mark_set_object */
-#endif /* ENABLED (JERRY_BUILTIN_SET) */
+#endif /* JERRY_BUILTIN_SET */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 /**
  * Mark objects referenced by inactive generator functions, async functions, etc.
  */
@@ -491,9 +618,9 @@ ecma_gc_mark_executable_object (ecma_object_t *object_p) /**< object */
 {
   vm_executable_object_t *executable_object_p = (vm_executable_object_t *) object_p;
 
-  if (executable_object_p->extended_object.u.class_prop.extra_info & ECMA_ASYNC_GENERATOR_CALLED)
+  if (executable_object_p->extended_object.u.cls.u2.executable_obj_flags & ECMA_ASYNC_GENERATOR_CALLED)
   {
-    ecma_value_t task = executable_object_p->extended_object.u.class_prop.u.head;
+    ecma_value_t task = executable_object_p->extended_object.u.cls.u3.head;
 
     while (!ECMA_IS_INTERNAL_VALUE_NULL (task))
     {
@@ -513,8 +640,9 @@ ecma_gc_mark_executable_object (ecma_object_t *object_p) /**< object */
   }
 
   ecma_gc_set_object_visited (executable_object_p->frame_ctx.lex_env_p);
+  ecma_gc_set_object_visited (executable_object_p->shared.function_object_p);
 
-  if (!ECMA_EXECUTABLE_OBJECT_IS_SUSPENDED (executable_object_p->extended_object.u.class_prop.extra_info))
+  if (!ECMA_EXECUTABLE_OBJECT_IS_SUSPENDED (executable_object_p))
   {
     /* All objects referenced by running executable objects are strong roots,
      * and a finished executable object cannot refer to other values. */
@@ -563,6 +691,21 @@ ecma_gc_mark_executable_object (ecma_object_t *object_p) /**< object */
 
     do
     {
+      if (VM_CONTEXT_IS_VARIABLE_LENGTH (VM_GET_CONTEXT_TYPE (context_top_p[-1])))
+      {
+        ecma_value_t *last_item_p = context_top_p - VM_GET_CONTEXT_END (context_top_p[-1]);
+        JERRY_ASSERT (last_item_p >= context_end_p);
+        context_top_p--;
+
+        do
+        {
+          ecma_gc_set_object_visited (ecma_get_object_from_value (*(--context_top_p)));
+        }
+        while (context_top_p > last_item_p);
+
+        continue;
+      }
+
       uint32_t offsets = vm_get_context_value_offsets (context_top_p);
 
       while (VM_CONTEXT_HAS_NEXT_OFFSET (offsets))
@@ -601,9 +744,9 @@ ecma_gc_mark_executable_object (ecma_object_t *object_p) /**< object */
   }
 } /* ecma_gc_mark_executable_object */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
 /**
  * Mark the objects referenced by a proxy object
  */
@@ -624,7 +767,7 @@ ecma_gc_mark_proxy_object (ecma_object_t *object_p) /**< proxy object */
     ecma_gc_set_object_visited (ecma_get_object_from_value (proxy_p->handler));
   }
 } /* ecma_gc_mark_proxy_object */
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
 /**
  * Mark objects as visited starting from specified object as root
@@ -644,18 +787,39 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
       ecma_gc_set_object_visited (ECMA_GET_NON_NULL_POINTER (ecma_object_t, outer_lex_env_cp));
     }
 
-    if (ecma_get_lex_env_type (object_p) != ECMA_LEXICAL_ENVIRONMENT_DECLARATIVE)
+    switch (ecma_get_lex_env_type (object_p))
     {
-      ecma_object_t *binding_object_p = ecma_get_lex_env_binding_object (object_p);
-      ecma_gc_set_object_visited (binding_object_p);
-      return;
+#if JERRY_ESNEXT
+      case ECMA_LEXICAL_ENVIRONMENT_CLASS:
+      {
+#if JERRY_MODULE_SYSTEM
+        if (object_p->type_flags_refs & ECMA_OBJECT_FLAG_LEXICAL_ENV_HAS_DATA)
+        {
+          ecma_gc_mark_properties (object_p, true);
+          ecma_gc_set_object_visited (((ecma_lexical_environment_class_t *) object_p)->module_p);
+          return;
+        }
+#endif /* JERRY_MODULE_SYSTEM */
+        /* FALLTHRU */
+      }
+#endif /* JERRY_ESNEXT */
+      case ECMA_LEXICAL_ENVIRONMENT_THIS_OBJECT_BOUND:
+      {
+        ecma_object_t *binding_object_p = ecma_get_lex_env_binding_object (object_p);
+        ecma_gc_set_object_visited (binding_object_p);
+        return;
+      }
+      default:
+      {
+        break;
+      }
     }
   }
   else
   {
     ecma_object_type_t object_type = ecma_get_object_type (object_p);
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
     if (JERRY_UNLIKELY (ecma_get_object_is_builtin (object_p)))
     {
       ecma_value_t realm_value;
@@ -679,11 +843,17 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
 
       ecma_gc_set_object_visited (ECMA_GET_INTERNAL_VALUE_POINTER (ecma_object_t, realm_value));
     }
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_BUILTIN_REALMS */
+
+    /**
+     * Have the object's prototype here so the object could set it to JMEM_CP_NULL
+     * if the prototype should be ignored (like in case of PROXY).
+     */
+    jmem_cpointer_t proto_cp = object_p->u2.prototype_cp;
 
     switch (object_type)
     {
-#if !ENABLED (JERRY_BUILTIN_REALMS)
+#if !JERRY_BUILTIN_REALMS
       case ECMA_OBJECT_TYPE_GENERAL:
       {
         if (JERRY_UNLIKELY (ecma_get_object_is_builtin (object_p))
@@ -693,71 +863,123 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
         }
         break;
       }
-#endif /* !ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* !JERRY_BUILTIN_REALMS */
       case ECMA_OBJECT_TYPE_CLASS:
       {
         ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
 
-        switch (ext_object_p->u.class_prop.class_id)
+        switch (ext_object_p->u.cls.type)
         {
-#if ENABLED (JERRY_BUILTIN_PROMISE)
-          case LIT_MAGIC_STRING_PROMISE_UL:
+          case ECMA_OBJECT_CLASS_ARGUMENTS:
+          {
+            ecma_gc_mark_arguments_object (ext_object_p);
+            break;
+          }
+#if JERRY_BUILTIN_TYPEDARRAY
+          case ECMA_OBJECT_CLASS_TYPEDARRAY:
+          {
+            ecma_gc_set_object_visited (ecma_typedarray_get_arraybuffer (object_p));
+            break;
+          }
+#endif /* JERRY_BUILTIN_TYPEDARRAY */
+#if JERRY_MODULE_SYSTEM
+          case ECMA_OBJECT_CLASS_MODULE_NAMESPACE:
+          {
+            JERRY_ASSERT (proto_cp == JMEM_CP_NULL);
+            ecma_gc_set_object_visited (ECMA_GET_INTERNAL_VALUE_POINTER (ecma_object_t,
+                                                                         ext_object_p->u.cls.u3.value));
+            ecma_gc_mark_properties (object_p, true);
+            return;
+          }
+#endif /* JERRY_MODULE_SYSTEM */
+#if JERRY_MODULE_SYSTEM
+          case ECMA_OBJECT_CLASS_MODULE:
+          {
+            ecma_module_t *module_p = ((ecma_module_t *) ext_object_p);
+
+            if (module_p->scope_p != NULL)
+            {
+              ecma_gc_set_object_visited (((ecma_module_t *) ext_object_p)->scope_p);
+            }
+
+            if (module_p->namespace_object_p != NULL)
+            {
+              ecma_gc_set_object_visited (((ecma_module_t *) ext_object_p)->namespace_object_p);
+            }
+
+            ecma_module_node_t *node_p = module_p->imports_p;
+
+            while (node_p != NULL)
+            {
+              if (ecma_is_value_object (node_p->u.path_or_module))
+              {
+                ecma_gc_set_object_visited (ecma_get_object_from_value (node_p->u.path_or_module));
+              }
+
+              node_p = node_p->next_p;
+            }
+            break;
+          }
+#endif /* JERRY_MODULE_SYSTEM */
+#if JERRY_BUILTIN_PROMISE
+          case ECMA_OBJECT_CLASS_PROMISE:
           {
             ecma_gc_mark_promise_object (ext_object_p);
             break;
           }
-#endif /* ENABLED (JERRY_BUILTIN_PROMISE) */
-#if ENABLED (JERRY_BUILTIN_DATAVIEW)
-          case LIT_MAGIC_STRING_DATAVIEW_UL:
+#endif /* JERRY_BUILTIN_PROMISE */
+#if JERRY_BUILTIN_DATAVIEW
+          case ECMA_OBJECT_CLASS_DATAVIEW:
           {
             ecma_dataview_object_t *dataview_p = (ecma_dataview_object_t *) object_p;
             ecma_gc_set_object_visited (dataview_p->buffer_p);
             break;
           }
-#endif /* ENABLED (JERRY_BUILTIN_DATAVIEW) */
-#if ENABLED (JERRY_BUILTIN_CONTAINER)
-#if ENABLED (JERRY_BUILTIN_WEAKSET)
-          case LIT_MAGIC_STRING_WEAKSET_UL:
+#endif /* JERRY_BUILTIN_DATAVIEW */
+#if JERRY_BUILTIN_CONTAINER
+          case ECMA_OBJECT_CLASS_CONTAINER:
           {
+#if JERRY_BUILTIN_MAP
+            if (ext_object_p->u.cls.u2.container_id == LIT_MAGIC_STRING_MAP_UL)
+            {
+              ecma_gc_mark_map_object (object_p);
+              break;
+            }
+#endif /* JERRY_BUILTIN_MAP */
+#if JERRY_BUILTIN_WEAKMAP
+            if (ext_object_p->u.cls.u2.container_id == LIT_MAGIC_STRING_WEAKMAP_UL)
+            {
+              ecma_gc_mark_weakmap_object (object_p);
+              break;
+            }
+#endif /* JERRY_BUILTIN_WEAKMAP */
+#if JERRY_BUILTIN_SET
+            if (ext_object_p->u.cls.u2.container_id == LIT_MAGIC_STRING_SET_UL)
+            {
+              ecma_gc_mark_set_object (object_p);
+              break;
+            }
+#endif /* JERRY_BUILTIN_SET */
+#if JERRY_BUILTIN_WEAKSET
+            JERRY_ASSERT (ext_object_p->u.cls.u2.container_id == LIT_MAGIC_STRING_WEAKSET_UL);
+#endif /* JERRY_BUILTIN_WEAKSET */
             break;
           }
-#endif /* ENABLED (JERRY_BUILTIN_WEAKSET) */
-#if ENABLED (JERRY_BUILTIN_SET)
-          case LIT_MAGIC_STRING_SET_UL:
-          {
-            ecma_gc_mark_set_object (object_p);
-            break;
-          }
-#endif /* ENABLED (JERRY_BUILTIN_SET) */
-#if ENABLED (JERRY_BUILTIN_WEAKMAP)
-          case LIT_MAGIC_STRING_WEAKMAP_UL:
-          {
-            ecma_gc_mark_weakmap_object (object_p);
-            break;
-          }
-#endif /* ENABLED (JERRY_BUILTIN_WEAKMAP) */
-#if ENABLED (JERRY_BUILTIN_MAP)
-          case LIT_MAGIC_STRING_MAP_UL:
-          {
-            ecma_gc_mark_map_object (object_p);
-            break;
-          }
-#endif /* ENABLED (JERRY_BUILTIN_MAP) */
-#endif /* ENABLED (JERRY_BUILTIN_CONTAINER) */
-#if ENABLED (JERRY_ESNEXT)
-          case LIT_MAGIC_STRING_GENERATOR_UL:
-          case LIT_MAGIC_STRING_ASYNC_GENERATOR_UL:
+#endif /* JERRY_BUILTIN_CONTAINER */
+#if JERRY_ESNEXT
+          case ECMA_OBJECT_CLASS_GENERATOR:
+          case ECMA_OBJECT_CLASS_ASYNC_GENERATOR:
           {
             ecma_gc_mark_executable_object (object_p);
             break;
           }
-          case LIT_INTERNAL_MAGIC_PROMISE_CAPABILITY:
+          case ECMA_OBJECT_CLASS_PROMISE_CAPABILITY:
           {
             ecma_promise_capabality_t *capability_p = (ecma_promise_capabality_t *) object_p;
 
-            if (ecma_is_value_object (capability_p->header.u.class_prop.u.promise))
+            if (ecma_is_value_object (capability_p->header.u.cls.u3.promise))
             {
-              ecma_gc_set_object_visited (ecma_get_object_from_value (capability_p->header.u.class_prop.u.promise));
+              ecma_gc_set_object_visited (ecma_get_object_from_value (capability_p->header.u.cls.u3.promise));
             }
             if (ecma_is_value_object (capability_p->resolve))
             {
@@ -769,51 +991,31 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
             }
             break;
           }
-#endif /* ENABLED (JERRY_ESNEXT) */
-          default:
+          case ECMA_OBJECT_CLASS_ARRAY_ITERATOR:
+          case ECMA_OBJECT_CLASS_SET_ITERATOR:
+          case ECMA_OBJECT_CLASS_MAP_ITERATOR:
           {
-            break;
-          }
-        }
-
-        break;
-      }
-      case ECMA_OBJECT_TYPE_PSEUDO_ARRAY:
-      {
-        ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
-
-        switch (ext_object_p->u.pseudo_array.type)
-        {
-#if ENABLED (JERRY_BUILTIN_TYPEDARRAY)
-          case ECMA_PSEUDO_ARRAY_TYPEDARRAY:
-          case ECMA_PSEUDO_ARRAY_TYPEDARRAY_WITH_INFO:
-          {
-            ecma_gc_set_object_visited (ecma_typedarray_get_arraybuffer (object_p));
-            break;
-          }
-#endif /* ENABLED (JERRY_BUILTIN_TYPEDARRAY) */
-#if ENABLED (JERRY_ESNEXT)
-          case ECMA_PSEUDO_ARRAY_ITERATOR:
-          case ECMA_PSEUDO_SET_ITERATOR:
-          case ECMA_PSEUDO_MAP_ITERATOR:
-          {
-            ecma_value_t iterated_value = ext_object_p->u.pseudo_array.u2.iterated_value;
+            ecma_value_t iterated_value = ext_object_p->u.cls.u3.iterated_value;
             if (!ecma_is_value_empty (iterated_value))
             {
               ecma_gc_set_object_visited (ecma_get_object_from_value (iterated_value));
             }
             break;
           }
-          case ECMA_PSEUDO_STRING_ITERATOR:
+#if JERRY_BUILTIN_REGEXP
+          case ECMA_OBJECT_CLASS_REGEXP_STRING_ITERATOR:
           {
+            ecma_regexp_string_iterator_t *regexp_string_iterator_obj = (ecma_regexp_string_iterator_t *) object_p;
+            ecma_value_t regexp = regexp_string_iterator_obj->iterating_regexp;
+            ecma_gc_set_object_visited (ecma_get_object_from_value (regexp));
             break;
           }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_BUILTIN_REGEXP */
+#endif /* JERRY_ESNEXT */
           default:
           {
-            JERRY_ASSERT (ext_object_p->u.pseudo_array.type == ECMA_PSEUDO_ARRAY_ARGUMENTS);
-
-            ecma_gc_mark_arguments_object (ext_object_p);
+            /* The ECMA_OBJECT_CLASS__MAX type represents an uninitialized class. */
+            JERRY_ASSERT (ext_object_p->u.cls.type <= ECMA_OBJECT_CLASS__MAX);
             break;
           }
         }
@@ -824,14 +1026,14 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
       {
         ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
         if (JERRY_UNLIKELY (ext_object_p->u.array.length_prop_and_hole_count & ECMA_ARRAY_TEMPLATE_LITERAL))
         {
           /* Template objects are never marked. */
           JERRY_ASSERT (object_p->type_flags_refs >= ECMA_OBJECT_REF_ONE);
           return;
         }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
         if (ecma_op_array_is_fast_array (ext_object_p))
         {
@@ -848,8 +1050,6 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
             }
           }
 
-          jmem_cpointer_t proto_cp = object_p->u2.prototype_cp;
-
           if (proto_cp != JMEM_CP_NULL)
           {
             ecma_gc_set_object_visited (ECMA_GET_NON_NULL_POINTER (ecma_object_t, proto_cp));
@@ -858,24 +1058,15 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
         }
         break;
       }
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
       case ECMA_OBJECT_TYPE_PROXY:
       {
         ecma_gc_mark_proxy_object (object_p);
-        /* No need to free the properties of a proxy (there should be none).
-         * Aside from the tag bits every other bit should be zero,
-         */
-        JERRY_ASSERT ((object_p->u1.property_list_cp & ~JMEM_TAG_MASK) == 0);
-
-        jmem_cpointer_t proto_cp = object_p->u2.prototype_cp;
-
-        if (proto_cp != JMEM_CP_NULL)
-        {
-          ecma_gc_set_object_visited (ECMA_GET_NON_NULL_POINTER (ecma_object_t, proto_cp));
-        }
-        return;
+        /* Prototype of proxy object is a bit set. */
+        proto_cp = JMEM_CP_NULL;
+        break;
       }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
       case ECMA_OBJECT_TYPE_BOUND_FUNCTION:
       {
         ecma_gc_mark_bound_function_object (object_p);
@@ -889,11 +1080,11 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
         ecma_gc_set_object_visited (ECMA_GET_NON_NULL_POINTER_FROM_POINTER_TAG (ecma_object_t,
                                                                                 ext_func_p->u.function.scope_cp));
 
-#if ENABLED (JERRY_ESNEXT) || ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_ESNEXT || JERRY_BUILTIN_REALMS
         const ecma_compiled_code_t *byte_code_p = ecma_op_function_get_compiled_code (ext_func_p);
-#endif /* ENABLED (JERRY_ESNEXT) || ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_ESNEXT || JERRY_BUILTIN_REALMS */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
         if (CBC_FUNCTION_IS_ARROW (byte_code_p->status_flags))
         {
           ecma_arrow_function_t *arrow_func_p = (ecma_arrow_function_t *) object_p;
@@ -908,41 +1099,53 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
             ecma_gc_set_object_visited (ecma_get_object_from_value (arrow_func_p->new_target));
           }
         }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
+#if JERRY_BUILTIN_REALMS
+#if JERRY_SNAPSHOT_EXEC
         if (ext_func_p->u.function.bytecode_cp == JMEM_CP_NULL)
         {
           /* Static snapshot functions have a global realm */
           break;
         }
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+#endif /* JERRY_SNAPSHOT_EXEC */
 
-        ecma_value_t realm_value;
+        ecma_object_t *realm_p;
 
         if (byte_code_p->status_flags & CBC_CODE_FLAGS_UINT16_ARGUMENTS)
         {
           cbc_uint16_arguments_t *args_p = (cbc_uint16_arguments_t *) byte_code_p;
-          realm_value = args_p->realm_value;
+          realm_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_object_t, args_p->realm_value);
         }
         else
         {
           cbc_uint8_arguments_t *args_p = (cbc_uint8_arguments_t *) byte_code_p;
-          realm_value = args_p->realm_value;
+          realm_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_object_t, args_p->realm_value);
         }
 
-        ecma_gc_set_object_visited (ecma_get_object_from_value (realm_value));
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+        ecma_gc_set_object_visited (realm_p);
+#endif /* JERRY_BUILTIN_REALMS */
         break;
       }
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT || JERRY_BUILTIN_REALMS
       case ECMA_OBJECT_TYPE_NATIVE_FUNCTION:
       {
+#endif /* JERRY_ESNEXT || JERRY_BUILTIN_REALMS */
+
+        if (!ecma_get_object_is_builtin (object_p))
+        {
+#if JERRY_BUILTIN_REALMS
+          ecma_native_function_t *native_function_p = (ecma_native_function_t *) object_p;
+          ecma_gc_set_object_visited (ECMA_GET_INTERNAL_VALUE_POINTER (ecma_object_t,
+                                                                       native_function_p->realm_value));
+#endif /* JERRY_BUILTIN_REALMS */
+          break;
+        }
+
+#if JERRY_ESNEXT
         ecma_extended_object_t *ext_func_p = (ecma_extended_object_t *) object_p;
 
-        if (ecma_get_object_is_builtin (object_p)
-            && ext_func_p->u.built_in.id == ECMA_BUILTIN_ID_HANDLER)
+        if (ext_func_p->u.built_in.id == ECMA_BUILTIN_ID_HANDLER)
         {
           switch (ext_func_p->u.built_in.routine_id)
           {
@@ -975,7 +1178,7 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
               ecma_gc_set_object_visited (ecma_get_object_from_value (executor_p->remaining_elements));
               break;
             }
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
             case ECMA_NATIVE_HANDLER_PROXY_REVOKE:
             {
               ecma_revocable_proxy_object_t *rev_proxy_p = (ecma_revocable_proxy_object_t *) object_p;
@@ -987,7 +1190,7 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
 
               break;
             }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
             case ECMA_NATIVE_HANDLER_VALUE_THUNK:
             case ECMA_NATIVE_HANDLER_VALUE_THROWER:
             {
@@ -1005,17 +1208,17 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
             }
           }
         }
+#endif /* JERRY_ESNEXT */
 
+#if JERRY_ESNEXT || JERRY_BUILTIN_REALMS
         break;
       }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT || JERRY_BUILTIN_REALMS */
       default:
       {
         break;
       }
     }
-
-    jmem_cpointer_t proto_cp = object_p->u2.prototype_cp;
 
     if (proto_cp != JMEM_CP_NULL)
     {
@@ -1023,62 +1226,64 @@ ecma_gc_mark (ecma_object_t *object_p) /**< object to mark from */
     }
   }
 
-  jmem_cpointer_t prop_iter_cp = object_p->u1.property_list_cp;
-
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
-  if (prop_iter_cp != JMEM_CP_NULL)
-  {
-    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
-    if (prop_iter_p->types[0] == ECMA_PROPERTY_TYPE_HASHMAP)
-    {
-      prop_iter_cp = prop_iter_p->next_property_cp;
-    }
-  }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
-
-  while (prop_iter_cp != JMEM_CP_NULL)
-  {
-    ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
-    JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY_PAIR (prop_iter_p));
-
-    ecma_gc_mark_properties ((ecma_property_pair_t *) prop_iter_p);
-
-    prop_iter_cp = prop_iter_p->next_property_cp;
-  }
+  ecma_gc_mark_properties (object_p, false);
 } /* ecma_gc_mark */
 
 /**
  * Free the native handle/pointer by calling its free callback.
  */
 static void
-ecma_gc_free_native_pointer (ecma_property_t *property_p) /**< property */
+ecma_gc_free_native_pointer (ecma_property_t property, /**< property descriptor */
+                             ecma_value_t value) /**< property value */
 {
-  JERRY_ASSERT (property_p != NULL);
-
-  ecma_property_value_t *value_p = ECMA_PROPERTY_VALUE_PTR (property_p);
-  ecma_native_pointer_t *native_pointer_p;
-
-  native_pointer_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_native_pointer_t,
-                                                      value_p->value);
-
-  while (native_pointer_p != NULL)
+  if (JERRY_LIKELY (property & ECMA_PROPERTY_FLAG_SINGLE_EXTERNAL))
   {
-    if (native_pointer_p->info_p != NULL)
+    JERRY_ASSERT (value != JMEM_CP_NULL);
+
+    ecma_native_pointer_t *native_pointer_p;
+    native_pointer_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_native_pointer_t, value);
+
+    if (native_pointer_p->native_info_p != NULL)
     {
-      ecma_object_native_free_callback_t free_cb = native_pointer_p->info_p->free_cb;
+      jerry_object_native_free_callback_t free_cb = native_pointer_p->native_info_p->free_cb;
 
       if (free_cb != NULL)
       {
-        free_cb (native_pointer_p->data_p);
+        free_cb (native_pointer_p->native_p, native_pointer_p->native_info_p);
       }
     }
 
-    ecma_native_pointer_t *next_p = native_pointer_p->next_p;
-
     jmem_heap_free_block (native_pointer_p, sizeof (ecma_native_pointer_t));
-
-    native_pointer_p = next_p;
+    return;
   }
+
+  if (value == JMEM_CP_NULL)
+  {
+    return;
+  }
+
+  ecma_native_pointer_chain_t *item_p;
+  item_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_native_pointer_chain_t, value);
+
+  do
+  {
+    if (item_p->data.native_info_p != NULL)
+    {
+      jerry_object_native_free_callback_t free_cb = item_p->data.native_info_p->free_cb;
+
+      if (free_cb != NULL)
+      {
+        free_cb (item_p->data.native_p, item_p->data.native_info_p);
+      }
+    }
+
+    ecma_native_pointer_chain_t *next_p = item_p->next_p;
+
+    jmem_heap_free_block (item_p, sizeof (ecma_native_pointer_chain_t));
+
+    item_p = next_p;
+  }
+  while (item_p != NULL);
 } /* ecma_gc_free_native_pointer */
 
 /**
@@ -1089,18 +1294,18 @@ ecma_gc_free_native_pointer (ecma_property_t *property_p) /**< property */
 static size_t
 ecma_free_arguments_object (ecma_extended_object_t *ext_object_p) /**< arguments object */
 {
-  JERRY_ASSERT (ecma_get_object_type ((ecma_object_t *) ext_object_p) == ECMA_OBJECT_TYPE_PSEUDO_ARRAY);
+  JERRY_ASSERT (ecma_get_object_type ((ecma_object_t *) ext_object_p) == ECMA_OBJECT_TYPE_CLASS);
 
   size_t object_size = sizeof (ecma_unmapped_arguments_t);
 
-  if (ext_object_p->u.pseudo_array.extra_info & ECMA_ARGUMENTS_OBJECT_MAPPED)
+  if (ext_object_p->u.cls.u1.arguments_flags & ECMA_ARGUMENTS_OBJECT_MAPPED)
   {
     ecma_mapped_arguments_t *mapped_arguments_p = (ecma_mapped_arguments_t *) ext_object_p;
     object_size = sizeof (ecma_mapped_arguments_t);
 
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
-    if (!(mapped_arguments_p->unmapped.header.u.pseudo_array.extra_info & ECMA_ARGUMENTS_OBJECT_STATIC_BYTECODE))
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+#if JERRY_SNAPSHOT_EXEC
+    if (!(mapped_arguments_p->unmapped.header.u.cls.u1.arguments_flags & ECMA_ARGUMENTS_OBJECT_STATIC_BYTECODE))
+#endif /* JERRY_SNAPSHOT_EXEC */
     {
       ecma_compiled_code_t *byte_code_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_compiled_code_t,
                                                                            mapped_arguments_p->u.byte_code);
@@ -1111,7 +1316,7 @@ ecma_free_arguments_object (ecma_extended_object_t *ext_object_p) /**< arguments
 
   ecma_value_t *argv_p = (ecma_value_t *) (((uint8_t *) ext_object_p) + object_size);
   ecma_unmapped_arguments_t *arguments_p = (ecma_unmapped_arguments_t *) ext_object_p;
-  uint32_t arguments_number = arguments_p->header.u.pseudo_array.u2.arguments_number;
+  uint32_t arguments_number = arguments_p->header.u.cls.u3.arguments_number;
 
   for (uint32_t i = 0; i < arguments_number; i++)
   {
@@ -1119,7 +1324,7 @@ ecma_free_arguments_object (ecma_extended_object_t *ext_object_p) /**< arguments
   }
 
   uint32_t saved_argument_count = JERRY_MAX (arguments_number,
-                                             arguments_p->header.u.pseudo_array.u1.formal_params_number);
+                                             arguments_p->header.u.cls.u2.formal_params_number);
 
   return object_size + (saved_argument_count * sizeof (ecma_value_t));
 } /* ecma_free_arguments_object */
@@ -1150,7 +1355,7 @@ ecma_free_fast_access_array (ecma_object_t *object_p) /**< fast access mode arra
   ecma_dealloc_extended_object (object_p, sizeof (ecma_extended_object_t));
 } /* ecma_free_fast_access_array */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 /**
  * Free non-objects referenced by inactive generator functions, async functions, etc.
@@ -1181,14 +1386,15 @@ ecma_gc_free_executable_object (ecma_object_t *object_p) /**< object */
   }
 
   size = JERRY_ALIGNUP (sizeof (vm_executable_object_t) + size, sizeof (uintptr_t));
-
-  JERRY_ASSERT (!(executable_object_p->extended_object.u.class_prop.extra_info & ECMA_EXECUTABLE_OBJECT_RUNNING));
-
   ecma_bytecode_deref ((ecma_compiled_code_t *) bytecode_header_p);
 
-  if (executable_object_p->extended_object.u.class_prop.extra_info & ECMA_ASYNC_GENERATOR_CALLED)
+  uint16_t executable_obj_flags = executable_object_p->extended_object.u.cls.u2.executable_obj_flags;
+
+  JERRY_ASSERT (!(executable_obj_flags & ECMA_EXECUTABLE_OBJECT_RUNNING));
+
+  if (executable_obj_flags & ECMA_ASYNC_GENERATOR_CALLED)
   {
-    ecma_value_t task = executable_object_p->extended_object.u.class_prop.u.head;
+    ecma_value_t task = executable_object_p->extended_object.u.cls.u3.head;
 
     while (!ECMA_IS_INTERNAL_VALUE_NULL (task))
     {
@@ -1203,7 +1409,7 @@ ecma_gc_free_executable_object (ecma_object_t *object_p) /**< object */
     }
   }
 
-  if (executable_object_p->extended_object.u.class_prop.extra_info & ECMA_EXECUTABLE_OBJECT_COMPLETED)
+  if (executable_obj_flags & ECMA_EXECUTABLE_OBJECT_COMPLETED)
   {
     return size;
   }
@@ -1229,6 +1435,21 @@ ecma_gc_free_executable_object (ecma_object_t *object_p) /**< object */
     do
     {
       context_top_p[-1] &= (uint32_t) ~VM_CONTEXT_HAS_LEX_ENV;
+
+      if (VM_CONTEXT_IS_VARIABLE_LENGTH (VM_GET_CONTEXT_TYPE (context_top_p[-1])))
+      {
+        ecma_value_t *last_item_p = context_top_p - VM_GET_CONTEXT_END (context_top_p[-1]);
+        JERRY_ASSERT (last_item_p >= context_end_p);
+        context_top_p--;
+
+        do
+        {
+          ecma_free_value_if_not_object (*(--context_top_p));
+        }
+        while (context_top_p > last_item_p);
+
+        continue;
+      }
 
       uint32_t offsets = vm_get_context_value_offsets (context_top_p);
 
@@ -1259,17 +1480,139 @@ ecma_gc_free_executable_object (ecma_object_t *object_p) /**< object */
   return size;
 } /* ecma_gc_free_executable_object */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
+
+JERRY_STATIC_ASSERT (!ECMA_PROPERTY_IS_RAW (ECMA_PROPERTY_TYPE_DELETED),
+                     ecma_property_type_deleted_must_not_be_raw_property);
+JERRY_STATIC_ASSERT ((ECMA_PROPERTY_TYPE_DELETED & ECMA_PROPERTY_FLAG_LCACHED) == 0,
+                     ecma_property_type_deleted_must_not_have_lcached_flag);
+JERRY_STATIC_ASSERT (ECMA_GC_FREE_SECOND_PROPERTY == 1,
+                     ecma_gc_free_second_must_be_one);
+
+/**
+ * Free property of an object
+ */
+void
+ecma_gc_free_property (ecma_object_t *object_p, /**< object */
+                       ecma_property_pair_t *prop_pair_p, /**< property pair */
+                       uint32_t options) /**< option bits including property index */
+{
+  /* Both cannot be deleted. */
+  JERRY_ASSERT (prop_pair_p->header.types[0] != ECMA_PROPERTY_TYPE_DELETED
+                || prop_pair_p->header.types[1] != ECMA_PROPERTY_TYPE_DELETED);
+  JERRY_ASSERT (prop_pair_p->header.types[0] != ECMA_PROPERTY_TYPE_HASHMAP);
+
+  uint32_t index = (options & ECMA_GC_FREE_SECOND_PROPERTY);
+  jmem_cpointer_t name_cp = prop_pair_p->names_cp[index];
+  ecma_property_t *property_p = prop_pair_p->header.types + index;
+  ecma_property_t property = *property_p;
+
+#if JERRY_LCACHE
+  if ((property & ECMA_PROPERTY_FLAG_LCACHED) != 0)
+  {
+    ecma_lcache_invalidate (object_p, name_cp, property_p);
+  }
+#endif /* JERRY_LCACHE */
+
+  if (ECMA_PROPERTY_IS_RAW (property))
+  {
+    if (ECMA_PROPERTY_GET_NAME_TYPE (property) == ECMA_DIRECT_STRING_PTR)
+    {
+      ecma_string_t *prop_name_p = ECMA_GET_NON_NULL_POINTER (ecma_string_t, name_cp);
+      ecma_deref_ecma_string (prop_name_p);
+    }
+
+    if (property & ECMA_PROPERTY_FLAG_DATA)
+    {
+      ecma_free_value_if_not_object (prop_pair_p->values[index].value);
+      return;
+    }
+
+    if (JERRY_UNLIKELY (options & ECMA_GC_FREE_REFERENCES))
+    {
+      return;
+    }
+
+#if JERRY_CPOINTER_32_BIT
+    ecma_getter_setter_pointers_t *getter_setter_pair_p;
+    getter_setter_pair_p = ECMA_GET_NON_NULL_POINTER (ecma_getter_setter_pointers_t,
+                                                      prop_pair_p->values[index].getter_setter_pair_cp);
+    jmem_pools_free (getter_setter_pair_p, sizeof (ecma_getter_setter_pointers_t));
+#endif /* JERRY_CPOINTER_32_BIT */
+    return;
+  }
+
+  if (property == ECMA_PROPERTY_TYPE_DELETED)
+  {
+    return;
+  }
+
+  ecma_value_t value = prop_pair_p->values[index].value;
+
+  switch (name_cp)
+  {
+#if JERRY_ESNEXT
+    case LIT_INTERNAL_MAGIC_STRING_ENVIRONMENT_RECORD:
+    {
+      ecma_environment_record_t *environment_record_p;
+      environment_record_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_environment_record_t, value);
+      jmem_heap_free_block (environment_record_p, sizeof (ecma_environment_record_t));
+      break;
+    }
+    case LIT_INTERNAL_MAGIC_STRING_CLASS_FIELD_COMPUTED:
+    {
+      ecma_value_t *compact_collection_p;
+      compact_collection_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_value_t, value);
+      ecma_compact_collection_free (compact_collection_p);
+      break;
+    }
+#endif /* JERRY_ESNEXT */
+#if JERRY_BUILTIN_WEAKMAP || JERRY_BUILTIN_WEAKSET || JERRY_BUILTIN_WEAKREF
+    case LIT_INTERNAL_MAGIC_STRING_WEAK_REFS:
+    {
+      ecma_collection_t *refs_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t, value);
+      for (uint32_t j = 0; j < refs_p->item_count; j++)
+      {
+        const ecma_value_t reference_value = refs_p->buffer_p[j];
+
+        if (!ecma_is_value_empty (reference_value))
+        {
+          ecma_object_t *obj_p = ecma_get_object_from_value (reference_value);
+
+          if (ecma_object_class_is (obj_p, ECMA_OBJECT_CLASS_WEAKREF))
+          {
+            ecma_extended_object_t *ext_obj_p = (ecma_extended_object_t *) obj_p;
+            ext_obj_p->u.cls.u3.target = ECMA_VALUE_UNDEFINED;
+            continue;
+          }
+          ecma_op_container_remove_weak_entry (obj_p, ecma_make_object_value (object_p));
+        }
+      }
+
+      ecma_collection_destroy (refs_p);
+      break;
+    }
+#endif /* JERRY_BUILTIN_WEAKMAP || JERRY_BUILTIN_WEAKSET || JERRY_BUILTIN_WEAKREF */
+    default:
+    {
+      JERRY_ASSERT (name_cp == LIT_INTERNAL_MAGIC_STRING_NATIVE_POINTER
+                    || name_cp == LIT_INTERNAL_MAGIC_STRING_NATIVE_POINTER_WITH_REFERENCES);
+      ecma_gc_free_native_pointer (property, value);
+      break;
+    }
+  }
+} /* ecma_gc_free_property */
 
 /**
  * Free properties of an object
  */
 void
-ecma_gc_free_properties (ecma_object_t *object_p) /**< object */
+ecma_gc_free_properties (ecma_object_t *object_p, /**< object */
+                         uint32_t options) /**< option bits */
 {
   jmem_cpointer_t prop_iter_cp = object_p->u1.property_list_cp;
 
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
+#if JERRY_PROPERTY_HASHMAP
   if (prop_iter_cp != JMEM_CP_NULL)
   {
     ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t,
@@ -1280,83 +1623,18 @@ ecma_gc_free_properties (ecma_object_t *object_p) /**< object */
       prop_iter_cp = object_p->u1.property_list_cp;
     }
   }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+#endif /* JERRY_PROPERTY_HASHMAP */
 
   while (prop_iter_cp != JMEM_CP_NULL)
   {
     ecma_property_header_t *prop_iter_p = ECMA_GET_NON_NULL_POINTER (ecma_property_header_t, prop_iter_cp);
     JERRY_ASSERT (ECMA_PROPERTY_IS_PROPERTY_PAIR (prop_iter_p));
 
-    /* Both cannot be deleted. */
-    JERRY_ASSERT (prop_iter_p->types[0] != ECMA_PROPERTY_TYPE_DELETED
-                  || prop_iter_p->types[1] != ECMA_PROPERTY_TYPE_DELETED);
-
     ecma_property_pair_t *prop_pair_p = (ecma_property_pair_t *) prop_iter_p;
 
-    for (int i = 0; i < ECMA_PROPERTY_PAIR_ITEM_COUNT; i++)
+    for (uint32_t i = 0; i < ECMA_PROPERTY_PAIR_ITEM_COUNT; i++)
     {
-      ecma_property_t *property_p = (ecma_property_t *) (prop_iter_p->types + i);
-      jmem_cpointer_t name_cp = prop_pair_p->names_cp[i];
-
-      if (ECMA_PROPERTY_GET_TYPE (*property_p) == ECMA_PROPERTY_TYPE_INTERNAL)
-      {
-        JERRY_ASSERT (ECMA_PROPERTY_GET_NAME_TYPE (*property_p) == ECMA_DIRECT_STRING_MAGIC);
-
-        /* Call the native's free callback. */
-        switch (name_cp)
-        {
-#if ENABLED (JERRY_ESNEXT)
-          case LIT_INTERNAL_MAGIC_STRING_ENVIRONMENT_RECORD:
-          {
-            ecma_environment_record_t *environment_record_p;
-            environment_record_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_environment_record_t,
-                                                                    prop_pair_p->values[i].value);
-            jmem_heap_free_block (environment_record_p, sizeof (ecma_environment_record_t));
-            break;
-          }
-          case LIT_INTERNAL_MAGIC_STRING_CLASS_FIELD_COMPUTED:
-          {
-            ecma_value_t *compact_collection_p;
-            compact_collection_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_value_t,
-                                                                    prop_pair_p->values[i].value);
-            ecma_compact_collection_free (compact_collection_p);
-            break;
-          }
-#endif /* ENABLED (JERRY_ESNEXT) */
-#if ENABLED (JERRY_BUILTIN_WEAKMAP) || ENABLED (JERRY_BUILTIN_WEAKSET)
-          case LIT_INTERNAL_MAGIC_STRING_WEAK_REFS:
-          {
-            ecma_collection_t *refs_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t,
-                                                                         prop_pair_p->values[i].value);
-            for (uint32_t j = 0; j < refs_p->item_count; j++)
-            {
-              const ecma_value_t value = refs_p->buffer_p[j];
-              if (!ecma_is_value_empty (value))
-              {
-                ecma_object_t *container_p = ecma_get_object_from_value (value);
-
-                ecma_op_container_remove_weak_entry (container_p,
-                                                     ecma_make_object_value (object_p));
-              }
-            }
-
-            ecma_collection_destroy (refs_p);
-            break;
-          }
-#endif /* ENABLED (JERRY_BUILTIN_WEAKMAP) || ENABLED (JERRY_BUILTIN_WEAKSET) */
-          default:
-          {
-            JERRY_ASSERT (name_cp == LIT_INTERNAL_MAGIC_STRING_NATIVE_POINTER);
-            ecma_gc_free_native_pointer (property_p);
-            break;
-          }
-        }
-      }
-
-      if (prop_iter_p->types[i] != ECMA_PROPERTY_TYPE_DELETED)
-      {
-        ecma_free_property (object_p, name_cp, property_p);
-      }
+      ecma_gc_free_property (object_p, prop_pair_p, i | options);
     }
 
     prop_iter_cp = prop_iter_p->next_property_cp;
@@ -1371,18 +1649,26 @@ ecma_gc_free_properties (ecma_object_t *object_p) /**< object */
 static void
 ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
 {
-  JERRY_ASSERT (object_p != NULL
-                && !ecma_gc_is_object_visited (object_p)
-                && ((object_p->type_flags_refs & ECMA_OBJECT_REF_MASK) == ECMA_OBJECT_NON_VISITED));
+  JERRY_ASSERT (object_p != NULL && !ecma_gc_is_object_visited (object_p));
 
   JERRY_ASSERT (JERRY_CONTEXT (ecma_gc_objects_number) > 0);
   JERRY_CONTEXT (ecma_gc_objects_number)--;
 
   if (ecma_is_lexical_environment (object_p))
   {
+#if JERRY_MODULE_SYSTEM
+    if (ecma_get_lex_env_type (object_p) == ECMA_LEXICAL_ENVIRONMENT_CLASS
+        && (object_p->type_flags_refs & ECMA_OBJECT_FLAG_LEXICAL_ENV_HAS_DATA))
+    {
+      ecma_gc_free_properties (object_p, ECMA_GC_FREE_REFERENCES);
+      ecma_dealloc_extended_object (object_p, sizeof (ecma_lexical_environment_class_t));
+      return;
+    }
+#endif /* JERRY_MODULE_SYSTEM */
+
     if (ecma_get_lex_env_type (object_p) == ECMA_LEXICAL_ENVIRONMENT_DECLARATIVE)
     {
-      ecma_gc_free_properties (object_p);
+      ecma_gc_free_properties (object_p, ECMA_GC_FREE_NO_OPTIONS);
     }
 
     ecma_dealloc_object (object_p);
@@ -1411,7 +1697,7 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
       {
         JERRY_ASSERT (object_type == ECMA_OBJECT_TYPE_NATIVE_FUNCTION);
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
         if (extended_object_p->u.built_in.id == ECMA_BUILTIN_ID_HANDLER)
         {
           switch (extended_object_p->u.built_in.routine_id)
@@ -1438,13 +1724,13 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
               ext_object_size = sizeof (ecma_promise_all_executor_t);
               break;
             }
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
             case ECMA_NATIVE_HANDLER_PROXY_REVOKE:
             {
               ext_object_size = sizeof (ecma_revocable_proxy_object_t);
               break;
             }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
             case ECMA_NATIVE_HANDLER_VALUE_THUNK:
             case ECMA_NATIVE_HANDLER_VALUE_THROWER:
             {
@@ -1458,7 +1744,7 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
             }
           }
         }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
       }
       else if (extended_object_p->u.built_in.id == ECMA_BUILTIN_ID_GLOBAL)
       {
@@ -1471,9 +1757,7 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
         ext_object_size += sizeof (uint64_t) * (length_and_bitset_size >> ECMA_BUILT_IN_BITSET_SHIFT);
       }
 
-      ecma_gc_free_properties (object_p);
-      ecma_dealloc_extended_object (object_p, ext_object_size);
-      return;
+      goto free_properties;
     }
   }
 
@@ -1481,7 +1765,7 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
   {
     case ECMA_OBJECT_TYPE_GENERAL:
     {
-      ecma_gc_free_properties (object_p);
+      ecma_gc_free_properties (object_p, ECMA_GC_FREE_NO_OPTIONS);
       ecma_dealloc_object (object_p);
       return;
     }
@@ -1496,47 +1780,116 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
     }
     case ECMA_OBJECT_TYPE_NATIVE_FUNCTION:
     {
+      ext_object_size = sizeof (ecma_native_function_t);
       break;
     }
     case ECMA_OBJECT_TYPE_CLASS:
     {
       ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
 
-      switch (ext_object_p->u.class_prop.class_id)
+      switch (ext_object_p->u.cls.type)
       {
-        case LIT_MAGIC_STRING_STRING_UL:
-        case LIT_MAGIC_STRING_NUMBER_UL:
-#if ENABLED (JERRY_ESNEXT)
-        case LIT_MAGIC_STRING_SYMBOL_UL:
-#endif /* ENABLED (JERRY_ESNEXT) */
-#if ENABLED (JERRY_BUILTIN_BIGINT)
-        case LIT_MAGIC_STRING_BIGINT_UL:
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
+        case ECMA_OBJECT_CLASS_STRING:
+        case ECMA_OBJECT_CLASS_NUMBER:
+#if JERRY_ESNEXT
+        case ECMA_OBJECT_CLASS_SYMBOL:
+#endif /* JERRY_ESNEXT */
+#if JERRY_BUILTIN_BIGINT
+        case ECMA_OBJECT_CLASS_BIGINT:
+#endif /* JERRY_BUILTIN_BIGINT */
         {
-          ecma_free_value (ext_object_p->u.class_prop.u.value);
+          ecma_free_value (ext_object_p->u.cls.u3.value);
           break;
         }
+        case ECMA_OBJECT_CLASS_ARGUMENTS:
+        {
+          ext_object_size = ecma_free_arguments_object (ext_object_p);
+          break;
+        }
+#if JERRY_BUILTIN_TYPEDARRAY
+        case ECMA_OBJECT_CLASS_TYPEDARRAY:
+        {
+          if (ext_object_p->u.cls.u2.typedarray_flags & ECMA_TYPEDARRAY_IS_EXTENDED)
+          {
+            ext_object_size = sizeof (ecma_extended_typedarray_object_t);
+          }
+          break;
+        }
+#endif /* JERRY_BUILTIN_TYPEDARRAY */
+#if JERRY_MODULE_SYSTEM
+        case ECMA_OBJECT_CLASS_MODULE_NAMESPACE:
+        {
+          ecma_gc_free_properties (object_p, ECMA_GC_FREE_REFERENCES);
+          ecma_dealloc_extended_object (object_p, sizeof (ecma_extended_object_t));
+          return;
+        }
+#endif /* JERRY_MODULE_SYSTEM */
+#if JERRY_PARSER
+        case ECMA_OBJECT_CLASS_SCRIPT:
+        {
+          ecma_compiled_code_t *compiled_code_p;
+          compiled_code_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_compiled_code_t,
+                                                             ext_object_p->u.cls.u3.value);
 
-        case LIT_MAGIC_STRING_DATE_UL:
-        {
-          ecma_number_t *num_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_number_t,
-                                                                  ext_object_p->u.class_prop.u.value);
-          ecma_dealloc_number (num_p);
+          ecma_bytecode_deref (compiled_code_p);
           break;
         }
-        case LIT_MAGIC_STRING_REGEXP_UL:
+#endif /* JERRY_PARSER */
+#if JERRY_BUILTIN_DATE
+        case ECMA_OBJECT_CLASS_DATE:
+        {
+#if JERRY_ESNEXT
+          ext_object_size = sizeof (ecma_date_object_t);
+#else /* !JERRY_ESNEXT */
+          ecma_number_t *num_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_number_t, ext_object_p->u.cls.u3.date);
+          ecma_dealloc_number (num_p);
+#endif /* JERRY_ESNEXT */
+          break;
+        }
+#endif /* JERRY_BUILTIN_DATE */
+#if JERRY_BUILTIN_REGEXP
+        case ECMA_OBJECT_CLASS_REGEXP:
         {
           ecma_compiled_code_t *bytecode_p = ECMA_GET_INTERNAL_VALUE_ANY_POINTER (ecma_compiled_code_t,
-                                                                                  ext_object_p->u.class_prop.u.value);
+                                                                                  ext_object_p->u.cls.u3.value);
 
           ecma_bytecode_deref (bytecode_p);
 
           break;
         }
-#if ENABLED (JERRY_BUILTIN_TYPEDARRAY)
-        case LIT_MAGIC_STRING_ARRAY_BUFFER_UL:
+#endif /* JERRY_BUILTIN_REGEXP */
+#if JERRY_ESNEXT
+        case ECMA_OBJECT_CLASS_STRING_ITERATOR:
         {
-          uint32_t arraybuffer_length = ext_object_p->u.class_prop.u.length;
+          ecma_value_t iterated_value = ext_object_p->u.cls.u3.iterated_value;
+
+          if (!ecma_is_value_empty (iterated_value))
+          {
+            ecma_deref_ecma_string (ecma_get_string_from_value (iterated_value));
+          }
+
+          break;
+        }
+#if JERRY_BUILTIN_REGEXP
+        case ECMA_OBJECT_CLASS_REGEXP_STRING_ITERATOR:
+        {
+          ecma_regexp_string_iterator_t *regexp_string_iterator_obj = (ecma_regexp_string_iterator_t *) object_p;
+          ecma_value_t iterated_string = regexp_string_iterator_obj->iterated_string;
+
+          if (!ecma_is_value_empty (iterated_string))
+          {
+            ecma_deref_ecma_string (ecma_get_string_from_value (iterated_string));
+          }
+
+          ext_object_size = sizeof (ecma_regexp_string_iterator_t);
+          break;
+        }
+#endif /* JERRY_BUILTIN_REGEXP */
+#endif /* JERRY_ESNEXT */
+#if JERRY_BUILTIN_TYPEDARRAY
+        case ECMA_OBJECT_CLASS_ARRAY_BUFFER:
+        {
+          uint32_t arraybuffer_length = ext_object_p->u.cls.u3.length;
 
           if (ECMA_ARRAYBUFFER_HAS_EXTERNAL_MEMORY (ext_object_p))
           {
@@ -1557,11 +1910,11 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
 
           break;
         }
-#endif /* ENABLED (JERRY_BUILTIN_TYPEDARRAY) */
-#if ENABLED (JERRY_BUILTIN_PROMISE)
-        case LIT_MAGIC_STRING_PROMISE_UL:
+#endif /* JERRY_BUILTIN_TYPEDARRAY */
+#if JERRY_BUILTIN_PROMISE
+        case ECMA_OBJECT_CLASS_PROMISE:
         {
-          ecma_free_value_if_not_object (ext_object_p->u.class_prop.u.value);
+          ecma_free_value_if_not_object (ext_object_p->u.cls.u3.value);
 
           /* Reactions only contains objects. */
           ecma_collection_destroy (((ecma_promise_object_t *) object_p)->reactions);
@@ -1569,147 +1922,104 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
           ext_object_size = sizeof (ecma_promise_object_t);
           break;
         }
-#endif /* ENABLED (JERRY_BUILTIN_PROMISE) */
-#if ENABLED (JERRY_BUILTIN_CONTAINER)
-#if ENABLED (JERRY_BUILTIN_MAP)
-        case LIT_MAGIC_STRING_MAP_UL:
-#endif /* ENABLED (JERRY_BUILTIN_MAP) */
-#if ENABLED (JERRY_BUILTIN_SET)
-        case LIT_MAGIC_STRING_SET_UL:
-#endif /* ENABLED (JERRY_BUILTIN_SET) */
-#if ENABLED (JERRY_BUILTIN_WEAKMAP)
-        case LIT_MAGIC_STRING_WEAKMAP_UL:
-#endif /* ENABLED (JERRY_BUILTIN_WEAKMAP) */
-#if ENABLED (JERRY_BUILTIN_WEAKSET)
-        case LIT_MAGIC_STRING_WEAKSET_UL:
-#endif /* ENABLED (JERRY_BUILTIN_WEAKSET) */
+#endif /* JERRY_BUILTIN_PROMISE */
+#if JERRY_BUILTIN_WEAKREF
+        case ECMA_OBJECT_CLASS_WEAKREF:
+        {
+          ecma_value_t target = ext_object_p->u.cls.u3.target;
+
+          if (!ecma_is_value_undefined (target))
+          {
+            ecma_op_object_unref_weak (ecma_get_object_from_value (target), ecma_make_object_value (object_p));
+          }
+          break;
+        }
+#endif /* JERRY_BUILTIN_WEAKREF */
+#if JERRY_BUILTIN_CONTAINER
+        case ECMA_OBJECT_CLASS_CONTAINER:
         {
           ecma_extended_object_t *map_object_p = (ecma_extended_object_t *) object_p;
           ecma_collection_t *container_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_collection_t,
-                                                                            map_object_p->u.class_prop.u.value);
+                                                                            map_object_p->u.cls.u3.value);
           ecma_op_container_free_entries (object_p);
           ecma_collection_destroy (container_p);
-
           break;
         }
-#endif /* ENABLED (JERRY_BUILTIN_CONTAINER) */
-#if ENABLED (JERRY_BUILTIN_DATAVIEW)
-        case LIT_MAGIC_STRING_DATAVIEW_UL:
+#endif /* JERRY_BUILTIN_CONTAINER */
+#if JERRY_BUILTIN_DATAVIEW
+        case ECMA_OBJECT_CLASS_DATAVIEW:
         {
           ext_object_size = sizeof (ecma_dataview_object_t);
           break;
         }
-#endif /* ENABLED (JERRY_BUILTIN_DATAVIEW) */
-#if ENABLED (JERRY_ESNEXT)
-        case LIT_MAGIC_STRING_GENERATOR_UL:
-        case LIT_MAGIC_STRING_ASYNC_GENERATOR_UL:
+#endif /* JERRY_BUILTIN_DATAVIEW */
+#if JERRY_ESNEXT
+        case ECMA_OBJECT_CLASS_GENERATOR:
+        case ECMA_OBJECT_CLASS_ASYNC_GENERATOR:
         {
           ext_object_size = ecma_gc_free_executable_object (object_p);
           break;
         }
-        case LIT_INTERNAL_MAGIC_PROMISE_CAPABILITY:
+        case ECMA_OBJECT_CLASS_PROMISE_CAPABILITY:
         {
           ext_object_size = sizeof (ecma_promise_capabality_t);
           break;
         }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
+#if JERRY_MODULE_SYSTEM
+        case ECMA_OBJECT_CLASS_MODULE:
+        {
+          ecma_module_release_module ((ecma_module_t *) ext_object_p);
+          ext_object_size = sizeof (ecma_module_t);
+          break;
+        }
+#endif /* JERRY_MODULE_SYSTEM */
         default:
         {
-          /* The undefined id represents an uninitialized class. */
-          JERRY_ASSERT (ext_object_p->u.class_prop.class_id == LIT_MAGIC_STRING_UNDEFINED
-                        || ext_object_p->u.class_prop.class_id == LIT_MAGIC_STRING_ARGUMENTS_UL
-                        || ext_object_p->u.class_prop.class_id == LIT_MAGIC_STRING_BOOLEAN_UL
-                        || ext_object_p->u.class_prop.class_id == LIT_MAGIC_STRING_ERROR_UL
-                        || ext_object_p->u.class_prop.class_id == LIT_INTERNAL_MAGIC_STRING_INTERNAL_OBJECT);
+          /* The ECMA_OBJECT_CLASS__MAX type represents an uninitialized class. */
+          JERRY_ASSERT (ext_object_p->u.cls.type <= ECMA_OBJECT_CLASS__MAX);
           break;
         }
       }
 
       break;
     }
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
     case ECMA_OBJECT_TYPE_PROXY:
     {
-      /* No need to free the properties of a proxy (there should be none).
-       * Aside from the tag bits every other bit should be zero,
-       */
-      JERRY_ASSERT ((object_p->u1.property_list_cp & ~JMEM_TAG_MASK) == 0);
-      ecma_dealloc_extended_object (object_p, sizeof (ecma_proxy_object_t));
-      return;
+      ext_object_size = sizeof (ecma_proxy_object_t);
+      break;
     }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
     case ECMA_OBJECT_TYPE_FUNCTION:
     {
       /* Function with byte-code (not a built-in function). */
       ecma_extended_object_t *ext_func_p = (ecma_extended_object_t *) object_p;
 
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
+#if JERRY_SNAPSHOT_EXEC
       if (ext_func_p->u.function.bytecode_cp != ECMA_NULL_POINTER)
       {
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+#endif /* JERRY_SNAPSHOT_EXEC */
         ecma_compiled_code_t *byte_code_p = (ECMA_GET_INTERNAL_VALUE_POINTER (ecma_compiled_code_t,
                                                                               ext_func_p->u.function.bytecode_cp));
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
         if (CBC_FUNCTION_IS_ARROW (byte_code_p->status_flags))
         {
           ecma_free_value_if_not_object (((ecma_arrow_function_t *) object_p)->this_binding);
           ecma_free_value_if_not_object (((ecma_arrow_function_t *) object_p)->new_target);
           ext_object_size = sizeof (ecma_arrow_function_t);
         }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
         ecma_bytecode_deref (byte_code_p);
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
+#if JERRY_SNAPSHOT_EXEC
       }
       else
       {
         ext_object_size = sizeof (ecma_static_function_t);
       }
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
-      break;
-    }
-    case ECMA_OBJECT_TYPE_PSEUDO_ARRAY:
-    {
-      ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
-
-      switch (ext_object_p->u.pseudo_array.type)
-      {
-        case ECMA_PSEUDO_ARRAY_ARGUMENTS:
-        {
-          ext_object_size = ecma_free_arguments_object (ext_object_p);
-          break;
-        }
-#if ENABLED (JERRY_BUILTIN_TYPEDARRAY)
-        case ECMA_PSEUDO_ARRAY_TYPEDARRAY_WITH_INFO:
-        {
-          ext_object_size = sizeof (ecma_extended_typedarray_object_t);
-          break;
-        }
-#endif /* ENABLED (JERRY_BUILTIN_TYPEDARRAY) */
-#if ENABLED (JERRY_ESNEXT)
-        case ECMA_PSEUDO_STRING_ITERATOR:
-        {
-          ecma_value_t iterated_value = ext_object_p->u.pseudo_array.u2.iterated_value;
-
-          if (!ecma_is_value_empty (iterated_value))
-          {
-            ecma_deref_ecma_string (ecma_get_string_from_value (iterated_value));
-          }
-
-          break;
-        }
-#endif /* ENABLED (JERRY_ESNEXT) */
-        default:
-        {
-          JERRY_ASSERT (ext_object_p->u.pseudo_array.type == ECMA_PSEUDO_ARRAY_TYPEDARRAY
-                        || ext_object_p->u.pseudo_array.type == ECMA_PSEUDO_ARRAY_ITERATOR
-                        || ext_object_p->u.pseudo_array.type == ECMA_PSEUDO_SET_ITERATOR
-                        || ext_object_p->u.pseudo_array.type == ECMA_PSEUDO_MAP_ITERATOR);
-          break;
-        }
-      }
-
+#endif /* JERRY_SNAPSHOT_EXEC */
       break;
     }
     case ECMA_OBJECT_TYPE_BOUND_FUNCTION:
@@ -1719,9 +2029,9 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
 
       ecma_value_t args_len_or_this = bound_func_p->header.u.bound_function.args_len_or_this;
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
       ecma_free_value (bound_func_p->target_length);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
       if (!ecma_is_value_integer_number (args_len_or_this))
       {
@@ -1747,7 +2057,8 @@ ecma_gc_free_object (ecma_object_t *object_p) /**< object to free */
     }
   }
 
-  ecma_gc_free_properties (object_p);
+free_properties:
+  ecma_gc_free_properties (object_p, ECMA_GC_FREE_NO_OPTIONS);
   ecma_dealloc_extended_object (object_p, ext_object_size);
 } /* ecma_gc_free_object */
 
@@ -1845,7 +2156,7 @@ ecma_gc_run (void)
         if (obj_iter_p->type_flags_refs >= ECMA_OBJECT_REF_ONE)
         {
           /* Set the reference count of non-marked gray object to 0 */
-          obj_iter_p->type_flags_refs = (uint16_t) (obj_iter_p->type_flags_refs & (ECMA_OBJECT_REF_ONE - 1));
+          obj_iter_p->type_flags_refs &= (ecma_object_descriptor_t) (ECMA_OBJECT_REF_ONE - 1);
           ecma_gc_mark (obj_iter_p);
           marked_anything_during_current_iteration = true;
         }
@@ -1880,10 +2191,10 @@ ecma_gc_run (void)
     obj_iter_cp = obj_next_cp;
   }
 
-#if ENABLED (JERRY_BUILTIN_REGEXP)
+#if JERRY_BUILTIN_REGEXP
   /* Free RegExp bytecodes stored in cache */
   re_cache_gc ();
-#endif /* ENABLED (JERRY_BUILTIN_REGEXP) */
+#endif /* JERRY_BUILTIN_REGEXP */
 } /* ecma_gc_run */
 
 /**
@@ -1894,24 +2205,24 @@ ecma_gc_run (void)
 void
 ecma_free_unused_memory (jmem_pressure_t pressure) /**< current pressure */
 {
-#if ENABLED (JERRY_DEBUGGER)
+#if JERRY_DEBUGGER
   while ((JERRY_CONTEXT (debugger_flags) & JERRY_DEBUGGER_CONNECTED)
          && JERRY_CONTEXT (debugger_byte_code_free_tail) != ECMA_NULL_POINTER)
   {
     /* Wait until all byte code is freed or the connection is aborted. */
     jerry_debugger_receive (NULL);
   }
-#endif /* ENABLED (JERRY_DEBUGGER) */
+#endif /* JERRY_DEBUGGER */
 
   if (JERRY_LIKELY (pressure == JMEM_PRESSURE_LOW))
   {
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
+#if JERRY_PROPERTY_HASHMAP
     if (JERRY_CONTEXT (ecma_prop_hashmap_alloc_state) > ECMA_PROP_HASHMAP_ALLOC_ON)
     {
       --JERRY_CONTEXT (ecma_prop_hashmap_alloc_state);
     }
     JERRY_CONTEXT (status_flags) &= (uint32_t) ~ECMA_STATUS_HIGH_PRESSURE_GC;
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+#endif /* JERRY_PROPERTY_HASHMAP */
     /*
      * If there is enough newly allocated objects since last GC, probably it is worthwhile to start GC now.
      * Otherwise, probability to free sufficient space is considered to be low.
@@ -1928,7 +2239,7 @@ ecma_free_unused_memory (jmem_pressure_t pressure) /**< current pressure */
   else if (pressure == JMEM_PRESSURE_HIGH)
   {
     /* Freeing as much memory as we currently can */
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
+#if JERRY_PROPERTY_HASHMAP
     if (JERRY_CONTEXT (status_flags) & ECMA_STATUS_HIGH_PRESSURE_GC)
     {
       JERRY_CONTEXT (ecma_prop_hashmap_alloc_state) = ECMA_PROP_HASHMAP_ALLOC_MAX;
@@ -1938,11 +2249,11 @@ ecma_free_unused_memory (jmem_pressure_t pressure) /**< current pressure */
       ++JERRY_CONTEXT (ecma_prop_hashmap_alloc_state);
       JERRY_CONTEXT (status_flags) |= ECMA_STATUS_HIGH_PRESSURE_GC;
     }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+#endif /* JERRY_PROPERTY_HASHMAP */
 
     ecma_gc_run ();
 
-#if ENABLED (JERRY_PROPRETY_HASHMAP)
+#if JERRY_PROPERTY_HASHMAP
     /* Free hashmaps of remaining objects. */
     jmem_cpointer_t obj_iter_cp = JERRY_CONTEXT (ecma_gc_objects_cp);
 
@@ -1976,7 +2287,7 @@ ecma_free_unused_memory (jmem_pressure_t pressure) /**< current pressure */
 
       obj_iter_cp = obj_iter_p->gc_next_cp;
     }
-#endif /* ENABLED (JERRY_PROPRETY_HASHMAP) */
+#endif /* JERRY_PROPERTY_HASHMAP */
 
     jmem_pools_collect_empty ();
     return;

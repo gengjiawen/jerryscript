@@ -17,6 +17,7 @@
 #define VM_H
 
 #include "ecma-globals.h"
+#include "ecma-module.h"
 #include "jrt.h"
 #include "vm-defines.h"
 
@@ -161,9 +162,9 @@ typedef enum
   VM_OC_ERROR,                   /**< error while the vm_loop is suspended */
 
   VM_OC_JUMP,                    /**< jump */
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   VM_OC_BRANCH_IF_NULLISH,       /** branch if undefined or null */
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
   VM_OC_BRANCH_IF_STRICT_EQUAL,  /**< branch if strict equal */
 
   /* These four opcodes must be in this order. */
@@ -185,9 +186,9 @@ typedef enum
   VM_OC_MUL,                     /**< mul */
   VM_OC_DIV,                     /**< div */
   VM_OC_MOD,                     /**< mod */
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   VM_OC_EXP,                     /**< exponentiation */
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   VM_OC_EQUAL,                   /**< equal */
   VM_OC_NOT_EQUAL,               /**< not equal */
@@ -223,26 +224,25 @@ typedef enum
   VM_OC_CREATE_ARGUMENTS,        /**< create arguments object */
   VM_OC_SET_BYTECODE_PTR,        /**< setting bytecode pointer */
   VM_OC_VAR_EVAL,                /**< variable and function evaluation */
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   VM_OC_EXT_VAR_EVAL,            /**< variable and function evaluation for
                                   *   functions with separate argument context */
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
   VM_OC_INIT_ARG_OR_FUNC,        /**< create and init a function or argument binding */
 
-#if ENABLED (JERRY_DEBUGGER)
+#if JERRY_DEBUGGER
   VM_OC_BREAKPOINT_ENABLED,      /**< enabled breakpoint for debugger */
   VM_OC_BREAKPOINT_DISABLED,     /**< disabled breakpoint for debugger */
-#endif /* ENABLED (JERRY_DEBUGGER) */
-#if ENABLED (JERRY_LINE_INFO)
+#endif /* JERRY_DEBUGGER */
+#if JERRY_LINE_INFO
   VM_OC_LINE,                    /**< line number of the next statement */
-#endif /* ENABLED (JERRY_LINE_INFO) */
-#if ENABLED (JERRY_ESNEXT)
+#endif /* JERRY_LINE_INFO */
+#if JERRY_ESNEXT
   VM_OC_CHECK_VAR,               /**< check redeclared vars in the global scope */
   VM_OC_CHECK_LET,               /**< check redeclared lets in the global scope */
   VM_OC_ASSIGN_LET_CONST,        /**< assign values to let/const declarations */
   VM_OC_INIT_BINDING,            /**< create and intialize a binding */
   VM_OC_THROW_CONST_ERROR,       /**< throw invalid assignment to const variable error */
-  VM_OC_THROW_SYNTAX_ERROR,      /**< throw syntax error */
   VM_OC_COPY_TO_GLOBAL,          /**< copy value to global lex env */
   VM_OC_COPY_FROM_ARG,           /**< copy value from arg lex env */
   VM_OC_CLONE_CONTEXT,           /**< clone lexical environment with let/const declarations */
@@ -275,16 +275,16 @@ typedef enum
 
   VM_OC_PUSH_SPREAD_ELEMENT,     /**< push spread element */
   VM_OC_PUSH_REST_OBJECT,        /**< push rest object */
-  VM_OC_GET_ITERATOR,            /**< GetIterator abstract operation */
+  VM_OC_ITERATOR_CONTEXT_CREATE, /**< create iterator conext */
+  VM_OC_ITERATOR_CONTEXT_END,    /**< finalize iterator cotnext */
   VM_OC_ITERATOR_STEP,           /**< IteratorStep abstract operation */
-  VM_OC_ITERATOR_CLOSE,          /**< IteratorClose abstract operation */
-  VM_OC_INITIALIZER_PUSH_LIST,   /**< push name list array */
-  VM_OC_INITIALIZER_PUSH_REST,   /**< push the object with the rest properties */
+  VM_OC_OBJ_INIT_CONTEXT_CREATE, /**< create object initializer context */
+  VM_OC_OBJ_INIT_CONTEXT_END,    /**< finalize object initializer context */
+  VM_OC_OBJ_INIT_PUSH_REST,      /**< push the object with the rest properties */
   VM_OC_INITIALIZER_PUSH_NAME,   /**< append string to name list array and push the string */
   VM_OC_DEFAULT_INITIALIZER,     /**< default initializer inside a pattern */
   VM_OC_REST_INITIALIZER,        /**< create rest object inside an array pattern */
   VM_OC_INITIALIZER_PUSH_PROP,   /**< push property for object initializer */
-  VM_OC_MOVE,                    /**< move element to the stack-top */
   VM_OC_SPREAD_ARGUMENTS,        /**< perform function call/construct with spreaded arguments */
   VM_OC_CREATE_GENERATOR,        /**< create a generator object */
   VM_OC_YIELD,                   /**< yield operation */
@@ -302,7 +302,7 @@ typedef enum
   VM_OC_SET__PROTO__,            /**< set prototype when __proto__: form is used */
   VM_OC_PUSH_STATIC_FIELD_FUNC,  /**< push static field initializer function */
   VM_OC_ADD_COMPUTED_FIELD,      /**< add computed field name */
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
   VM_OC_NONE,                    /**< a special opcode for unsupported byte codes */
 } vm_oc_types;
 
@@ -311,18 +311,18 @@ typedef enum
  */
 typedef enum
 {
-#if !ENABLED (JERRY_ESNEXT)
+#if !JERRY_ESNEXT
   VM_OC_EXP = VM_OC_NONE,                     /**< exponentiation */
   VM_OC_BRANCH_IF_NULLISH = VM_OC_NONE,       /** branch if undefined or null */
-#endif /* !ENABLED (JERRY_ESNEXT) */
-#if !ENABLED (JERRY_DEBUGGER)
+#endif /* !JERRY_ESNEXT */
+#if !JERRY_DEBUGGER
   VM_OC_BREAKPOINT_ENABLED = VM_OC_NONE,      /**< enabled breakpoint for debugger is unused */
   VM_OC_BREAKPOINT_DISABLED = VM_OC_NONE,     /**< disabled breakpoint for debugger is unused */
-#endif /* !ENABLED (JERRY_DEBUGGER) */
-#if !ENABLED (JERRY_LINE_INFO)
+#endif /* !JERRY_DEBUGGER */
+#if !JERRY_LINE_INFO
   VM_OC_LINE = VM_OC_NONE,                    /**< line number of the next statement is unused */
-#endif /* !ENABLED (JERRY_LINE_INFO) */
-#if !ENABLED (JERRY_ESNEXT)
+#endif /* !JERRY_LINE_INFO */
+#if !JERRY_ESNEXT
   VM_OC_EXT_VAR_EVAL = VM_OC_NONE,            /**< variable and function evaluation for
                                                *   functions with separate argument context */
   VM_OC_CHECK_VAR = VM_OC_NONE,               /**< check redeclared vars in the global scope */
@@ -330,7 +330,6 @@ typedef enum
   VM_OC_ASSIGN_LET_CONST = VM_OC_NONE,        /**< assign values to let/const declarations */
   VM_OC_INIT_BINDING = VM_OC_NONE,            /**< create and intialize a binding */
   VM_OC_THROW_CONST_ERROR = VM_OC_NONE,       /**< throw invalid assignment to const variable error */
-  VM_OC_THROW_SYNTAX_ERROR = VM_OC_NONE,      /**< throw syntax error */
   VM_OC_COPY_TO_GLOBAL = VM_OC_NONE,          /**< copy value to global lex env */
   VM_OC_COPY_FROM_ARG = VM_OC_NONE,           /**< copy value from arg lex env */
   VM_OC_CLONE_CONTEXT = VM_OC_NONE,           /**< clone lexical environment with let/const declarations */
@@ -363,16 +362,16 @@ typedef enum
 
   VM_OC_PUSH_SPREAD_ELEMENT = VM_OC_NONE,     /**< push spread element */
   VM_OC_PUSH_REST_OBJECT = VM_OC_NONE,        /**< push rest object */
-  VM_OC_GET_ITERATOR = VM_OC_NONE,            /**< GetIterator abstract operation */
+  VM_OC_ITERATOR_CONTEXT_CREATE = VM_OC_NONE, /**< create iterator context */
   VM_OC_ITERATOR_STEP = VM_OC_NONE,           /**< IteratorStep abstract operation */
-  VM_OC_ITERATOR_CLOSE = VM_OC_NONE,          /**< IteratorClose abstract operation */
-  VM_OC_INITIALIZER_PUSH_LIST = VM_OC_NONE,   /**< push name list array */
-  VM_OC_INITIALIZER_PUSH_REST = VM_OC_NONE,   /**< push the object with the rest properties */
+  VM_OC_ITERATOR_CONTEXT_END = VM_OC_NONE,    /**< finalize iterator cotnext */
+  VM_OC_OBJ_INIT_CONTEXT_CREATE = VM_OC_NONE, /**< create object initializer context */
+  VM_OC_OBJ_INIT_CONTEXT_END = VM_OC_NONE,    /**< finalize object initializer context */
+  VM_OC_OBJ_INIT_PUSH_REST = VM_OC_NONE,      /**< push the object with the rest properties */
   VM_OC_INITIALIZER_PUSH_NAME = VM_OC_NONE,   /**< append string to name list array and push the string */
   VM_OC_DEFAULT_INITIALIZER = VM_OC_NONE,     /**< default initializer inside a pattern */
   VM_OC_REST_INITIALIZER = VM_OC_NONE,        /**< create rest object inside an array pattern */
   VM_OC_INITIALIZER_PUSH_PROP = VM_OC_NONE,   /**< push property for object initializer */
-  VM_OC_MOVE = VM_OC_NONE,                    /**< move element to the stack-top */
   VM_OC_SPREAD_ARGUMENTS = VM_OC_NONE,        /**< perform function call/construct with spreaded arguments */
   VM_OC_CREATE_GENERATOR = VM_OC_NONE,        /**< create a generator object */
   VM_OC_YIELD = VM_OC_NONE,                   /**< yield operation */
@@ -390,7 +389,7 @@ typedef enum
   VM_OC_SET__PROTO__ = VM_OC_NONE,            /**< set prototype when __proto__: form is used */
   VM_OC_PUSH_STATIC_FIELD_FUNC = VM_OC_NONE,  /**< push static field initializer function */
   VM_OC_ADD_COMPUTED_FIELD = VM_OC_NONE,      /**< add computed field name */
-#endif /* !ENABLED (JERRY_ESNEXT) */
+#endif /* !JERRY_ESNEXT */
 
   VM_OC_UNUSED = VM_OC_NONE                   /**< placeholder if the list is empty */
 } vm_oc_unused_types;
@@ -480,9 +479,10 @@ typedef enum
 ecma_value_t vm_run_global (const ecma_compiled_code_t *bytecode_p);
 ecma_value_t vm_run_eval (ecma_compiled_code_t *bytecode_data_p, uint32_t parse_opts);
 
-#if ENABLED (JERRY_MODULE_SYSTEM)
-ecma_value_t vm_run_module (const ecma_compiled_code_t *bytecode_p, ecma_object_t *lex_env_p);
-#endif /* ENABLED (JERRY_MODULE_SYSTEM) */
+#if JERRY_MODULE_SYSTEM
+ecma_value_t vm_run_module (ecma_module_t *module_p);
+ecma_value_t vm_init_module_scope (ecma_module_t *module_p);
+#endif /* JERRY_MODULE_SYSTEM */
 
 ecma_value_t vm_run (vm_frame_ctx_shared_t *shared_p, ecma_value_t this_binding_value, ecma_object_t *lex_env_p);
 ecma_value_t vm_execute (vm_frame_ctx_t *frame_ctx_p);

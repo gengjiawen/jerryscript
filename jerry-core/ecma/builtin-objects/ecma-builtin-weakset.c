@@ -17,7 +17,7 @@
 #include "ecma-exceptions.h"
 #include "ecma-container-object.h"
 
-#if ENABLED (JERRY_BUILTIN_WEAKSET)
+#if JERRY_BUILTIN_WEAKSET
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -47,7 +47,7 @@ ecma_builtin_weakset_dispatch_call (const ecma_value_t *arguments_list_p, /**< a
 {
   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
 
-  return ecma_raise_type_error (ECMA_ERR_MSG ("Constructor WeakSet requires 'new'."));
+  return ecma_raise_type_error (ECMA_ERR_MSG ("Constructor WeakSet requires 'new'"));
 } /* ecma_builtin_weakset_dispatch_call */
 
 /**
@@ -71,4 +71,4 @@ ecma_builtin_weakset_dispatch_construct (const ecma_value_t *arguments_list_p, /
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_WEAKSET) */
+#endif /* JERRY_BUILTIN_WEAKSET */

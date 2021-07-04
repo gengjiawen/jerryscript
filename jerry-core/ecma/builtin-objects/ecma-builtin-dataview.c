@@ -17,7 +17,7 @@
 #include "ecma-exceptions.h"
 #include "ecma-dataview-object.h"
 
-#if ENABLED (JERRY_BUILTIN_DATAVIEW)
+#if JERRY_BUILTIN_DATAVIEW
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -47,7 +47,7 @@ ecma_builtin_dataview_dispatch_call (const ecma_value_t *arguments_list_p, /**< 
 {
   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
 
-  return ecma_raise_type_error (ECMA_ERR_MSG ("Constructor DataView requires 'new'."));
+  return ecma_raise_type_error (ECMA_ERR_MSG ("Constructor DataView requires 'new'"));
 } /* ecma_builtin_dataview_dispatch_call */
 
 /**
@@ -68,4 +68,4 @@ ecma_builtin_dataview_dispatch_construct (const ecma_value_t *arguments_list_p, 
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_DATAVIEW */
+#endif /* JERRY_BUILTIN_DATAVIEW */

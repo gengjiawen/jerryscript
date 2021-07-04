@@ -29,7 +29,7 @@
 #include "vm.h"
 #include "vm-stack.h"
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 /** \addtogroup ecma ECMA
  * @{
@@ -55,26 +55,23 @@ ecma_async_generator_enqueue (vm_executable_object_t *async_generator_object_p, 
   task_p->operation_value = ecma_copy_value_if_not_object (value);
   task_p->operation_type = (uint8_t) operation;
 
-  ecma_object_t *old_new_target_p = JERRY_CONTEXT (current_new_target);
-  JERRY_CONTEXT (current_new_target) = ecma_builtin_get (ECMA_BUILTIN_ID_PROMISE);
-  ecma_value_t result = ecma_op_create_promise_object (ECMA_VALUE_EMPTY, ECMA_PROMISE_EXECUTOR_EMPTY);
-  JERRY_CONTEXT (current_new_target) = old_new_target_p;
+  ecma_value_t result = ecma_op_create_promise_object (ECMA_VALUE_EMPTY, ECMA_VALUE_UNDEFINED, NULL);
   task_p->promise = result;
 
-  ecma_value_t head = async_generator_object_p->extended_object.u.class_prop.u.head;
+  ecma_value_t head = async_generator_object_p->extended_object.u.cls.u3.head;
 
   if (ECMA_IS_INTERNAL_VALUE_NULL (head))
   {
-    ECMA_SET_INTERNAL_VALUE_POINTER (async_generator_object_p->extended_object.u.class_prop.u.head, task_p);
+    ECMA_SET_INTERNAL_VALUE_POINTER (async_generator_object_p->extended_object.u.cls.u3.head, task_p);
 
-    if (async_generator_object_p->extended_object.u.class_prop.extra_info & ECMA_ASYNC_GENERATOR_CALLED)
+    if (async_generator_object_p->extended_object.u.cls.u2.executable_obj_flags & ECMA_ASYNC_GENERATOR_CALLED)
     {
       ecma_value_t executable_object = ecma_make_object_value ((ecma_object_t *) async_generator_object_p);
       ecma_enqueue_promise_async_generator_job (executable_object);
       return result;
     }
 
-    async_generator_object_p->extended_object.u.class_prop.extra_info |= ECMA_ASYNC_GENERATOR_CALLED;
+    async_generator_object_p->extended_object.u.cls.u2.executable_obj_flags |= ECMA_ASYNC_GENERATOR_CALLED;
     ecma_async_generator_run (async_generator_object_p);
     return result;
   }
@@ -153,13 +150,13 @@ ecma_async_yield_throw (vm_executable_object_t *async_generator_object_p, /**< a
 
     if (result == ECMA_VALUE_UNDEFINED)
     {
-      return ecma_raise_type_error (ECMA_ERR_MSG ("Iterator throw() is not available."));
+      return ecma_raise_type_error (ECMA_ERR_MSG ("Iterator 'throw' is not available"));
     }
 
     result = ecma_async_yield_call (result,
                                     async_generator_object_p,
                                     ECMA_VALUE_EMPTY,
-                                    ECMA_ERR_MSG ("Iterator return() is not callable."));
+                                    ECMA_ERR_MSG ("Iterator 'return' is not callable"));
 
     if (ECMA_IS_VALUE_ERROR (result))
     {
@@ -173,7 +170,7 @@ ecma_async_yield_throw (vm_executable_object_t *async_generator_object_p, /**< a
   result = ecma_async_yield_call (result,
                                   async_generator_object_p,
                                   value,
-                                  ECMA_ERR_MSG ("Iterator throw() is not callable."));
+                                  ECMA_ERR_MSG ("Iterator 'throw' is not callable"));
 
   if (ECMA_IS_VALUE_ERROR (result))
   {
@@ -193,15 +190,15 @@ ecma_async_yield_throw (vm_executable_object_t *async_generator_object_p, /**< a
 ecma_value_t
 ecma_async_generator_run (vm_executable_object_t *async_generator_object_p) /**< async generator */
 {
-  JERRY_ASSERT (async_generator_object_p->extended_object.u.class_prop.class_id
-                == LIT_MAGIC_STRING_ASYNC_GENERATOR_UL);
-  JERRY_ASSERT (!ECMA_IS_INTERNAL_VALUE_NULL (async_generator_object_p->extended_object.u.class_prop.u.head));
+  JERRY_ASSERT (async_generator_object_p->extended_object.u.cls.type == ECMA_OBJECT_CLASS_ASYNC_GENERATOR);
+  JERRY_ASSERT (!ECMA_IS_INTERNAL_VALUE_NULL (async_generator_object_p->extended_object.u.cls.u3.head));
 
-  ecma_value_t head = async_generator_object_p->extended_object.u.class_prop.u.head;
+  ecma_value_t head = async_generator_object_p->extended_object.u.cls.u3.head;
   ecma_async_generator_task_t *task_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_async_generator_task_t, head);
   ecma_value_t result;
 
-  if (async_generator_object_p->extended_object.u.class_prop.extra_info & ECMA_EXECUTABLE_OBJECT_DO_AWAIT_OR_YIELD)
+  if (async_generator_object_p->extended_object.u.cls.u2.executable_obj_flags
+      & ECMA_EXECUTABLE_OBJECT_DO_AWAIT_OR_YIELD)
   {
     switch (task_p->operation_type)
     {
@@ -258,7 +255,7 @@ ecma_async_generator_run (vm_executable_object_t *async_generator_object_p) /**<
 
     JERRY_ASSERT (ECMA_IS_VALUE_ERROR (result));
 
-    async_generator_object_p->extended_object.u.class_prop.extra_info &= ECMA_AWAIT_CLEAR_MASK;
+    async_generator_object_p->extended_object.u.cls.u2.executable_obj_flags &= ECMA_AWAIT_CLEAR_MASK;
     async_generator_object_p->frame_ctx.block_result = ECMA_VALUE_UNDEFINED;
     async_generator_object_p->frame_ctx.byte_code_p = opfunc_resume_executable_object_with_throw;
 
@@ -286,9 +283,9 @@ ecma_async_generator_run (vm_executable_object_t *async_generator_object_p) /**<
 
   result = opfunc_resume_executable_object (async_generator_object_p, result);
 
-  if (async_generator_object_p->extended_object.u.class_prop.extra_info & ECMA_EXECUTABLE_OBJECT_COMPLETED)
+  if (async_generator_object_p->extended_object.u.cls.u2.executable_obj_flags & ECMA_EXECUTABLE_OBJECT_COMPLETED)
   {
-    JERRY_ASSERT (head == async_generator_object_p->extended_object.u.class_prop.u.head);
+    JERRY_ASSERT (head == async_generator_object_p->extended_object.u.cls.u3.head);
     ecma_async_generator_finalize (async_generator_object_p, result);
     result = ECMA_VALUE_UNDEFINED;
   }
@@ -303,7 +300,7 @@ void
 ecma_async_generator_finalize (vm_executable_object_t *async_generator_object_p, /**< async generator */
                                ecma_value_t value) /**< final value (takes reference) */
 {
-  ecma_value_t next = async_generator_object_p->extended_object.u.class_prop.u.head;
+  ecma_value_t next = async_generator_object_p->extended_object.u.cls.u3.head;
   ecma_async_generator_task_t *task_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_async_generator_task_t, next);
 
   if (ECMA_IS_VALUE_ERROR (value))
@@ -321,7 +318,7 @@ ecma_async_generator_finalize (vm_executable_object_t *async_generator_object_p,
   ecma_free_value (value);
 
   next = task_p->next;
-  async_generator_object_p->extended_object.u.class_prop.u.head = next;
+  async_generator_object_p->extended_object.u.cls.u3.head = next;
   jmem_heap_free_block (task_p, sizeof (ecma_async_generator_task_t));
 
   while (!ECMA_IS_INTERNAL_VALUE_NULL (next))
@@ -342,7 +339,7 @@ ecma_async_generator_finalize (vm_executable_object_t *async_generator_object_p,
     ecma_free_value_if_not_object (task_p->operation_value);
 
     next = task_p->next;
-    async_generator_object_p->extended_object.u.class_prop.u.head = next;
+    async_generator_object_p->extended_object.u.cls.u3.head = next;
     jmem_heap_free_block (task_p, sizeof (ecma_async_generator_task_t));
   }
 } /* ecma_async_generator_finalize */
@@ -366,7 +363,7 @@ ecma_await_continue (vm_executable_object_t *executable_object_p, /**< executabl
       if (!ecma_is_value_object (value))
       {
         ecma_free_value (value);
-        return ecma_raise_type_error (ECMA_ERR_MSG ("Value received by yield* is not Object."));
+        return ecma_raise_type_error (ECMA_ERR_MSG ("Value received by yield* is not object"));
       }
 
       ecma_object_t *result_obj_p = ecma_get_object_from_value (value);
@@ -423,7 +420,7 @@ ecma_await_continue (vm_executable_object_t *executable_object_p, /**< executabl
       result = ecma_async_yield_call (result,
                                       executable_object_p,
                                       value,
-                                      ECMA_ERR_MSG ("Iterator return() is not callable."));
+                                      ECMA_ERR_MSG ("Iterator 'return' is not callable"));
       ecma_free_value (value);
 
       if (ECMA_IS_VALUE_ERROR (result))
@@ -450,8 +447,8 @@ ecma_await_continue (vm_executable_object_t *executable_object_p, /**< executabl
     }
     case ECMA_AWAIT_YIELD_CLOSE:
     {
-      const char *msg_p = (ecma_is_value_object (value) ? ECMA_ERR_MSG ("Iterator throw() is not available.")
-                                                        : ECMA_ERR_MSG ("Value received by yield* is not Object."));
+      const char *msg_p = (ecma_is_value_object (value) ? ECMA_ERR_MSG ("Iterator 'throw' is not available")
+                                                        : ECMA_ERR_MSG ("Value received by yield* is not object"));
 
       ecma_free_value (value);
       return ecma_raise_type_error (msg_p);
@@ -465,7 +462,7 @@ ecma_await_continue (vm_executable_object_t *executable_object_p, /**< executabl
       if (!is_value_object
           && VM_GET_CONTEXT_TYPE (executable_object_p->frame_ctx.stack_top_p[-1]) != VM_CONTEXT_FINALLY_THROW)
       {
-        return ecma_raise_type_error (ECMA_ERR_MSG ("Iterator return() result is not object"));
+        return ecma_raise_type_error (ECMA_ERR_MSG ("Iterator 'return' result is not object"));
       }
       return ECMA_VALUE_EMPTY;
     }
@@ -478,7 +475,7 @@ ecma_await_continue (vm_executable_object_t *executable_object_p, /**< executabl
       if (!ecma_is_value_object (value))
       {
         ecma_free_value (value);
-        return ecma_raise_type_error (ECMA_ERR_MSG ("Value received by for-async-of is not Object."));
+        return ecma_raise_type_error (ECMA_ERR_MSG ("Value received by for-async-of is not object"));
       }
 
       ecma_object_t *result_obj_p = ecma_get_object_from_value (value);
@@ -534,7 +531,7 @@ ecma_await_continue (vm_executable_object_t *executable_object_p, /**< executabl
   }
 } /* ecma_await_continue */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * @}

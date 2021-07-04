@@ -45,13 +45,11 @@ main_register_global_function (const char *name_p, /**< name of the function */
 } /* main_register_global_function */
 
 static jerry_value_t
-main_create_realm (const jerry_value_t func_obj_val, /**< function object */
-                   const jerry_value_t this_p, /**< this arg */
+main_create_realm (const jerry_call_info_t *call_info_p, /**< call information */
                    const jerry_value_t args_p[], /**< function arguments */
                    const jerry_length_t args_cnt) /**< number of function arguments */
 {
-  (void) func_obj_val; /* unused */
-  (void) this_p; /* unused */
+  (void) call_info_p; /* unused */
   (void) args_p; /* unused */
   (void) args_cnt; /* unused */
   return jerry_create_realm ();
@@ -86,13 +84,11 @@ test262_register_function (jerry_value_t test262_obj, /** $262 object */
  *         value marked with error flag - otherwise
  */
 static jerry_value_t
-test262_detach_array_buffer (const jerry_value_t func_obj_val, /**< function object */
-                             const jerry_value_t this_p, /**< this arg */
+test262_detach_array_buffer (const jerry_call_info_t *call_info_p, /**< call information */
                              const jerry_value_t args_p[], /**< function arguments */
                              const jerry_length_t args_cnt) /**< number of function arguments */
 {
-  (void) func_obj_val; /* unused */
-  (void) this_p; /* unused */
+  (void) call_info_p; /* unused */
 
   if (args_cnt < 1 || !jerry_value_is_arraybuffer (args_p[0]))
   {
@@ -112,13 +108,11 @@ test262_detach_array_buffer (const jerry_value_t func_obj_val, /**< function obj
  * @return completion of the script parsing and execution.
  */
 static jerry_value_t
-test262_eval_script (const jerry_value_t func_obj_val, /**< function object */
-                     const jerry_value_t this_p, /**< this arg */
+test262_eval_script (const jerry_call_info_t *call_info_p, /**< call information */
                      const jerry_value_t args_p[], /**< function arguments */
                      const jerry_length_t args_cnt) /**< number of function arguments */
 {
-  (void) func_obj_val; /* unused */
-  (void) this_p; /* unused */
+  (void) call_info_p; /* unused */
 
   if (args_cnt < 1 || !jerry_value_is_string (args_p[0]))
   {
@@ -134,7 +128,7 @@ test262_eval_script (const jerry_value_t func_obj_val, /**< function object */
     return jerry_create_error (JERRY_ERROR_RANGE, (jerry_char_t *) "Internal error");
   }
 
-  jerry_value_t ret_value = jerry_parse (NULL, 0, str_buf_p, str_size, JERRY_PARSE_NO_OPTS);
+  jerry_value_t ret_value = jerry_parse (str_buf_p, str_size, NULL);
 
   if (!jerry_value_is_error (ret_value))
   {
@@ -148,17 +142,48 @@ test262_eval_script (const jerry_value_t func_obj_val, /**< function object */
   return ret_value;
 } /* test262_eval_script */
 
+static jerry_value_t
+create_test262 (jerry_value_t global_obj);
+
 /**
- * Init the $262 object
+ * $262.createRealm
+ *
+ * A function which creates a new realm object, and returns a newly created $262 object
+ *
+ * @return a new $262 object
  */
-static void
-register_test262 (void)
+static jerry_value_t
+test262_create_realm (const jerry_call_info_t *call_info_p, /**< call information */
+                      const jerry_value_t args_p[], /**< function arguments */
+                      const jerry_length_t args_cnt) /**< number of function arguments */
 {
-  jerry_value_t global_obj = jerry_get_global_object ();
+  (void) call_info_p; /* unused */
+  (void) args_p; /* unused */
+  (void) args_cnt; /* unused */
+
+  jerry_value_t realm_object = jerry_create_realm ();
+  jerry_value_t previous_realm = jerry_set_realm (realm_object);
+  assert (!jerry_value_is_error (previous_realm));
+  jerry_value_t test262_object = create_test262 (realm_object);
+  jerry_set_realm (previous_realm);
+  jerry_release_value (realm_object);
+
+  return test262_object;
+} /* test262_create_realm */
+
+/**
+ * Create a new $262 object
+ *
+ * @return a new $262 object
+ */
+static jerry_value_t
+create_test262 (jerry_value_t global_obj) /**< global object */
+{
   jerry_value_t test262_object = jerry_create_object ();
 
   test262_register_function (test262_object, "detachArrayBuffer", test262_detach_array_buffer);
   test262_register_function (test262_object, "evalScript", test262_eval_script);
+  test262_register_function (test262_object, "createRealm", test262_create_realm);
   test262_register_function (test262_object, "gc", jerryx_handler_gc);
 
   jerry_value_t prop_name = jerry_create_string ((const jerry_char_t *) "global");
@@ -171,19 +196,62 @@ register_test262 (void)
 
   jerry_release_value (prop_name);
   assert (!jerry_value_is_error (result));
-
-  jerry_release_value (global_obj);
-  jerry_release_value (test262_object);
   jerry_release_value (result);
-} /* register_test262 */
+
+  return test262_object;
+} /* create_test262 */
+
+static void
+promise_callback (jerry_promise_event_type_t event_type, /**< event type */
+                  const jerry_value_t object, /**< target object */
+                  const jerry_value_t value, /**< optional argument */
+                  void *user_p) /**< user pointer passed to the callback */
+{
+  (void) value; /* unused */
+  (void) user_p; /* unused */
+  const jerry_size_t max_allowed_size = 5 * 1024 - 1;
+
+  if (event_type != JERRY_PROMISE_EVENT_REJECT_WITHOUT_HANDLER)
+  {
+    return;
+  }
+
+  jerry_value_t reason = jerry_get_promise_result (object);
+  jerry_value_t reason_to_string = jerry_value_to_string (reason);
+
+  if (!jerry_value_is_error (reason_to_string))
+  {
+    jerry_size_t buffer_size = jerry_get_utf8_string_size (reason_to_string);
+
+    if (buffer_size > max_allowed_size)
+    {
+      buffer_size = max_allowed_size;
+    }
+
+    JERRY_VLA (jerry_char_t, str_buf_p, buffer_size + 1);
+    jerry_string_to_utf8_char_buffer (reason_to_string, str_buf_p, buffer_size);
+    str_buf_p[buffer_size] = '\0';
+
+    jerry_port_log (JERRY_LOG_LEVEL_WARNING, "Uncaught Promise rejection: %s\n", str_buf_p);
+  }
+  else
+  {
+    jerry_port_log (JERRY_LOG_LEVEL_WARNING, "Uncaught Promise rejection (reason cannot be converted to string)\n");
+  }
+
+  jerry_release_value (reason_to_string);
+  jerry_release_value (reason);
+} /* promise_callback */
 
 /**
  * Inits the engine and the debugger
  */
 void
-main_init_engine (main_args_t *arguments_p) /** main arguments */
+main_init_engine (main_args_t *arguments_p) /**< main arguments */
 {
   jerry_init (arguments_p->init_flags);
+
+  jerry_promise_set_callback (JERRY_PROMISE_EVENT_FILTER_ERROR, promise_callback, NULL);
 
   if (arguments_p->option_flags & OPT_FLAG_DEBUG_SERVER)
   {
@@ -211,7 +279,10 @@ main_init_engine (main_args_t *arguments_p) /** main arguments */
   }
   if (arguments_p->option_flags & OPT_FLAG_TEST262_OBJECT)
   {
-    register_test262 ();
+    jerry_value_t global_obj = jerry_get_global_object ();
+    jerry_value_t test262_object = create_test262 (global_obj);
+    jerry_release_value (test262_object);
+    jerry_release_value (global_obj);
   }
   main_register_global_function ("assert", jerryx_handler_assert);
   main_register_global_function ("gc", jerryx_handler_gc);
@@ -288,9 +359,6 @@ main_print_unhandled_exception (jerry_value_t error_value) /**< error value */
 
       if (err_line != 0 && err_col > 0 && err_col < SYNTAX_ERROR_MAX_LINE_LENGTH)
       {
-        uint32_t curr_line = 1;
-        uint32_t pos = 0;
-
         /* Temporarily modify the error message, so we can use the path. */
         *path_str_end_p = '\0';
 
@@ -300,38 +368,44 @@ main_print_unhandled_exception (jerry_value_t error_value) /**< error value */
         /* Revert the error message. */
         *path_str_end_p = ':';
 
-        /* 2. seek and print */
-        while (pos < source_size && curr_line < err_line)
+        if (source_p != NULL)
         {
-          if (source_p[pos] == '\n')
+          uint32_t curr_line = 1;
+          uint32_t pos = 0;
+
+          /* 2. seek and print */
+          while (pos < source_size && curr_line < err_line)
           {
-            curr_line++;
+            if (source_p[pos] == '\n')
+            {
+              curr_line++;
+            }
+
+            pos++;
           }
 
-          pos++;
+          /* Print character if:
+          * - The max line length is not reached.
+          * - The current position is valid (it is not the end of the source).
+          * - The current character is not a newline.
+          **/
+          for (uint32_t char_count = 0;
+              (char_count < SYNTAX_ERROR_MAX_LINE_LENGTH) && (pos < source_size) && (source_p[pos] != '\n');
+              char_count++, pos++)
+          {
+            jerry_port_log (JERRY_LOG_LEVEL_ERROR, "%c", source_p[pos]);
+          }
+          jerry_port_log (JERRY_LOG_LEVEL_ERROR, "\n");
+
+          jerry_port_release_source (source_p);
+
+          while (--err_col)
+          {
+            jerry_port_log (JERRY_LOG_LEVEL_ERROR, "~");
+          }
+
+          jerry_port_log (JERRY_LOG_LEVEL_ERROR, "^\n\n");
         }
-
-        /* Print character if:
-         * - The max line length is not reached.
-         * - The current position is valid (it is not the end of the source).
-         * - The current character is not a newline.
-         **/
-        for (uint32_t char_count = 0;
-             (char_count < SYNTAX_ERROR_MAX_LINE_LENGTH) && (pos < source_size) && (source_p[pos] != '\n');
-             char_count++, pos++)
-        {
-          jerry_port_log (JERRY_LOG_LEVEL_ERROR, "%c", source_p[pos]);
-        }
-        jerry_port_log (JERRY_LOG_LEVEL_ERROR, "\n");
-
-        jerry_port_release_source (source_p);
-
-        while (--err_col)
-        {
-          jerry_port_log (JERRY_LOG_LEVEL_ERROR, "~");
-        }
-
-        jerry_port_log (JERRY_LOG_LEVEL_ERROR, "^\n\n");
       }
     }
   }
@@ -400,11 +474,15 @@ main_wait_for_source_callback (const jerry_char_t *resource_name_p, /**< resourc
                                void *user_p) /**< user pointer */
 {
   (void) user_p; /* unused */
-  jerry_value_t ret_val = jerry_parse (resource_name_p,
-                                       resource_name_size,
-                                       source_p,
+
+  jerry_parse_options_t parse_options;
+  parse_options.options = JERRY_PARSE_HAS_RESOURCE;
+  parse_options.resource_name_p = resource_name_p;
+  parse_options.resource_name_length = resource_name_size;
+
+  jerry_value_t ret_val = jerry_parse (source_p,
                                        source_size,
-                                       JERRY_PARSE_NO_OPTS);
+                                       &parse_options);
 
   if (!jerry_value_is_error (ret_val))
   {

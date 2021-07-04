@@ -29,3 +29,15 @@ for (var idx = 0; idx < items.length; idx++) {
 
   assert ((new type).name === expected_name);
 }
+
+assert (AggregateError.name === "AggregateError");
+assert (new AggregateError([]).name === "AggregateError")
+
+try
+{
+  new AggregateError.name === "TypeError";
+}
+catch(e)
+{
+  assert (e instanceof TypeError)
+}

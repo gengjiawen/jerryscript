@@ -24,15 +24,19 @@
 static int native_free_cb_call_count;
 
 static void
-native_free_cb (void *native_p)
+native_free_cb (void *native_p, /**< native pointer */
+                jerry_object_native_info_t *info_p) /**< native info */
 {
-  ++native_free_cb_call_count;
   (void) native_p;
+  (void) info_p;
+  ++native_free_cb_call_count;
 } /* native_free_cb */
 
 static const jerry_object_native_info_t native_info =
 {
   .free_cb = native_free_cb,
+  .number_of_references = 0,
+  .offset_of_references = 0,
 };
 
 static jerry_value_t

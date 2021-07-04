@@ -54,7 +54,9 @@ def get_tests(test_dir, test_list, skip_list):
     if test_dir:
         tests = []
         for root, _, files in os.walk(test_dir):
-            tests.extend([os.path.join(root, test_file) for test_file in files if test_file.endswith('.js')])
+            for test_file in files:
+                if test_file.endswith('.js') or test_file.endswith('.mjs'):
+                    tests.extend([os.path.join(root, test_file)])
 
     if test_list:
         dirname = os.path.dirname(test_list)
@@ -71,12 +73,6 @@ def get_tests(test_dir, test_list, skip_list):
         return True
 
     return [test for test in tests if filter_tests(test)]
-
-
-def get_platform_cmd_prefix():
-    if sys.platform == 'win32':
-        return ['cmd', '/S', '/C']
-    return []
 
 
 def execute_test_command(test_cmd):
@@ -124,7 +120,7 @@ def main(args):
 
 
 def run_normal_tests(args, tests):
-    test_cmd = get_platform_cmd_prefix()
+    test_cmd = util.get_platform_cmd_prefix()
     if args.runtime:
         test_cmd.append(args.runtime)
     test_cmd.extend([args.engine, '--call-on-exit', '__checkAsync'])
@@ -136,7 +132,12 @@ def run_normal_tests(args, tests):
         tested += 1
         test_path = os.path.relpath(test)
         is_expected_to_fail = os.path.join(os.path.sep, 'fail', '') in test
-        (returncode, stdout) = execute_test_command(test_cmd + [test])
+
+        test_argument = []
+        if test.endswith('.mjs'):
+            test_argument.extend(['-m'])
+
+        (returncode, stdout) = execute_test_command(test_cmd + test_argument + [test])
 
         if (returncode == 0 and not is_expected_to_fail) or (returncode == 1 and is_expected_to_fail):
             passed += 1
@@ -154,8 +155,8 @@ def run_normal_tests(args, tests):
 
 
 def run_snapshot_tests(args, tests):
-    execute_snapshot_cmd = get_platform_cmd_prefix()
-    generate_snapshot_cmd = get_platform_cmd_prefix()
+    execute_snapshot_cmd = util.get_platform_cmd_prefix()
+    generate_snapshot_cmd = util.get_platform_cmd_prefix()
     if args.runtime:
         execute_snapshot_cmd.append(args.runtime)
         generate_snapshot_cmd.append(args.runtime)

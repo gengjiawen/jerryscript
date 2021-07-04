@@ -49,15 +49,16 @@ jerry:
 	 -DCMAKE_C_COMPILER=xtensa-lx106-elf-gcc \
 	 -DCMAKE_C_COMPILER_WORKS=TRUE \
 	 -DENABLE_LTO=OFF \
-	 -DENABLE_ALL_IN_ONE=ON \
+	 -DENABLE_AMALGAM=ON \
+	 -DJERRY_MATH=ON \
 	 -DJERRY_CMDLINE=OFF \
 	 -DJERRY_PROFILE="es5.1" \
 	 -DEXTERNAL_COMPILE_FLAGS="$(ESP_CFLAGS)" \
 	 -DJERRY_GLOBAL_HEAP_SIZE=$(JERRYHEAP)
 
-	make -C$(BUILD_DIR) jerry-core jerry-libm
+	make -C$(BUILD_DIR) jerry-core jerry-math
 	cp $(BUILD_DIR)/lib/libjerry-core.a $(COPYTARGET)/
-	cp $(BUILD_DIR)/lib/libjerry-libm.a $(COPYTARGET)/
+	cp $(BUILD_DIR)/lib/libjerry-math.a $(COPYTARGET)/
 
 js2c:
 	tools/js2c.py --dest targets/esp8266/include --js-source targets/esp8266/js

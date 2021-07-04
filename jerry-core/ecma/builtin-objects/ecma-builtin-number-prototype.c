@@ -28,7 +28,7 @@
 #include "jrt-libc-includes.h"
 #include "lit-char-helpers.h"
 
-#if ENABLED (JERRY_BUILTIN_NUMBER)
+#if JERRY_BUILTIN_NUMBER
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -168,7 +168,7 @@ ecma_builtin_number_prototype_object_to_string (ecma_number_t this_arg_number, /
 
     if (radix < 2 || radix > 36)
     {
-      return ecma_raise_range_error (ECMA_ERR_MSG ("Radix must be between 2 and 36."));
+      return ecma_raise_range_error (ECMA_ERR_MSG ("Radix must be between 2 and 36"));
     }
   }
 
@@ -446,17 +446,17 @@ ecma_builtin_number_prototype_object_value_of (ecma_value_t this_arg) /**< this 
   {
     ecma_object_t *object_p = ecma_get_object_from_value (this_arg);
 
-    if (ecma_object_class_is (object_p, LIT_MAGIC_STRING_NUMBER_UL))
+    if (ecma_object_class_is (object_p, ECMA_OBJECT_CLASS_NUMBER))
     {
       ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
 
-      JERRY_ASSERT (ecma_is_value_number (ext_object_p->u.class_prop.u.value));
+      JERRY_ASSERT (ecma_is_value_number (ext_object_p->u.cls.u3.value));
 
-      return ext_object_p->u.class_prop.u.value;
+      return ext_object_p->u.cls.u3.value;
     }
   }
 
-  return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a Number or a Number object."));
+  return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a number or a Number object"));
 } /* ecma_builtin_number_prototype_object_value_of */
 
 /**
@@ -496,7 +496,7 @@ ecma_builtin_number_prototype_object_to_number_convert (ecma_number_t this_num, 
   if (mode == NUMBER_ROUTINE_TO_FIXED
       && (arg_num <= -1 || arg_num >= 101))
   {
-    return ecma_raise_range_error (ECMA_ERR_MSG ("Fraction digits must be between 0 and 100."));
+    return ecma_raise_range_error (ECMA_ERR_MSG ("Fraction digits must be between 0 and 100"));
   }
 
   /* Handle NaN separately */
@@ -565,13 +565,13 @@ ecma_builtin_number_prototype_object_to_number_convert (ecma_number_t this_num, 
       && (arg_num <= -1 || arg_num >= 101))
   {
     ecma_stringbuilder_destroy (&builder);
-    return ecma_raise_range_error (ECMA_ERR_MSG ("Fraction digits must be between 0 and 100."));
+    return ecma_raise_range_error (ECMA_ERR_MSG ("Fraction digits must be between 0 and 100"));
   }
   else if (mode == NUMBER_ROUTINE_TO_PRECISION
           && (arg_num < 1 || arg_num > 100))
   {
     ecma_stringbuilder_destroy (&builder);
-    return ecma_raise_range_error (ECMA_ERR_MSG ("Precision digits must be between 1 and 100."));
+    return ecma_raise_range_error (ECMA_ERR_MSG ("Precision digits must be between 1 and 100"));
   }
 
   num_of_digits = ecma_number_to_decimal (this_num, digits, &exponent);
@@ -802,4 +802,4 @@ ecma_builtin_number_prototype_dispatch_routine (uint8_t builtin_routine_id, /**<
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_NUMBER) */
+#endif /* JERRY_BUILTIN_NUMBER */

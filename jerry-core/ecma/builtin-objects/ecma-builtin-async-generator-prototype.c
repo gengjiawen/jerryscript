@@ -25,7 +25,7 @@
 #include "opcodes.h"
 #include "vm-defines.h"
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -106,7 +106,7 @@ ecma_builtin_async_generator_prototype_dispatch_routine (uint8_t builtin_routine
     {
       ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
 
-      if (ext_object_p->u.class_prop.class_id == LIT_MAGIC_STRING_ASYNC_GENERATOR_UL)
+      if (ext_object_p->u.cls.type == ECMA_OBJECT_CLASS_ASYNC_GENERATOR)
       {
         executable_object_p = (vm_executable_object_t *) ext_object_p;
       }
@@ -115,10 +115,10 @@ ecma_builtin_async_generator_prototype_dispatch_routine (uint8_t builtin_routine
 
   if (executable_object_p == NULL)
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not an async generator object."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not an async generator object"));
   }
 
-  if (executable_object_p->extended_object.u.class_prop.extra_info & ECMA_EXECUTABLE_OBJECT_COMPLETED)
+  if (executable_object_p->extended_object.u.cls.u2.executable_obj_flags & ECMA_EXECUTABLE_OBJECT_COMPLETED)
   {
     ecma_value_t promise = ecma_make_object_value (ecma_builtin_get (ECMA_BUILTIN_ID_PROMISE));
 
@@ -144,4 +144,4 @@ ecma_builtin_async_generator_prototype_dispatch_routine (uint8_t builtin_routine
  * @}
  */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */

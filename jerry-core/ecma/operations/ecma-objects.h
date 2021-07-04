@@ -27,6 +27,35 @@
  * @{
  */
 
+#if JERRY_ERROR_MESSAGES
+/**
+ * Reject with TypeError depending on 'is_throw' with the given format
+ */
+#define ECMA_REJECT_WITH_FORMAT(is_throw, msg, ...) \
+  ((is_throw) ? ecma_raise_standard_error_with_format (JERRY_ERROR_TYPE, (msg), __VA_ARGS__) : ECMA_VALUE_FALSE)
+
+/**
+ * Reject with TypeError depending on 'is_throw' with the given message
+ */
+#define ECMA_REJECT(is_throw, msg) \
+  ((is_throw) ? ecma_raise_type_error (msg) : ECMA_VALUE_FALSE)
+#else /* !JERRY_ERROR_MESSAGES */
+/**
+ * Reject with TypeError depending on is_throw flags wit the given format
+ */
+#define ECMA_REJECT_WITH_FORMAT(is_throw, msg, ...) \
+  ECMA_REJECT((is_throw), (msg))
+
+/**
+ * Reject with TypeError depending on is_throw flags wit the given message
+ */
+#define ECMA_REJECT(is_throw, msg) \
+  ((is_throw) ? ecma_raise_type_error (NULL) : ECMA_VALUE_FALSE)
+#endif /* JERRY_ERROR_MESSAGES */
+
+ecma_value_t ecma_raise_property_redefinition (ecma_string_t *property_name_p, uint16_t flags);
+ecma_value_t ecma_raise_readonly_assignment (ecma_string_t *property_name_p, bool is_throw);
+
 ecma_property_t ecma_op_object_get_own_property (ecma_object_t *object_p, ecma_string_t *property_name_p,
                                                  ecma_property_ref_t *property_ref_p, uint32_t options);
 bool ecma_op_ordinary_object_has_own_property (ecma_object_t *object_p, ecma_string_t *property_name_p);
@@ -40,12 +69,13 @@ ecma_value_t ecma_op_object_get_with_receiver (ecma_object_t *object_p, ecma_str
 ecma_value_t ecma_op_object_get_length (ecma_object_t *object_p, ecma_length_t *length_p);
 ecma_value_t ecma_op_object_get_by_index (ecma_object_t *object_p, ecma_length_t index);
 ecma_value_t ecma_op_object_get_by_magic_id (ecma_object_t *object_p, lit_magic_string_id_t property_id);
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 ecma_string_t *ecma_op_get_global_symbol (lit_magic_string_id_t property_id);
+bool ecma_op_compare_string_to_global_symbol (ecma_string_t *string_p, lit_magic_string_id_t property_id);
 ecma_value_t ecma_op_object_get_by_symbol_id (ecma_object_t *object_p, lit_magic_string_id_t property_id);
 ecma_value_t ecma_op_get_method_by_symbol_id (ecma_value_t value, lit_magic_string_id_t symbol_id);
 ecma_value_t ecma_op_get_method_by_magic_id (ecma_value_t value, lit_magic_string_id_t magic_id);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 ecma_value_t ecma_op_object_put_with_receiver (ecma_object_t *object_p, ecma_string_t *property_name_p,
                                                ecma_value_t value, ecma_value_t receiver, bool is_throw);
 ecma_value_t ecma_op_object_put (ecma_object_t *object_p, ecma_string_t *property_name_p, ecma_value_t value,
@@ -62,6 +92,8 @@ ecma_value_t ecma_op_object_define_own_property (ecma_object_t *obj_p, ecma_stri
 ecma_value_t ecma_op_object_get_own_property_descriptor (ecma_object_t *object_p, ecma_string_t *property_name_p,
                                                          ecma_property_descriptor_t *prop_desc_p);
 ecma_value_t ecma_op_object_has_instance (ecma_object_t *obj_p, ecma_value_t value);
+ecma_object_t *ecma_op_object_get_prototype_of (ecma_object_t *obj_p);
+
 ecma_value_t ecma_op_object_is_prototype_of (ecma_object_t *base_p, ecma_object_t *target_p);
 ecma_collection_t * ecma_op_object_get_enumerable_property_names (ecma_object_t *obj_p,
                                                                   ecma_enumerable_property_names_options_t option);
@@ -69,15 +101,20 @@ ecma_collection_t *ecma_op_object_own_property_keys (ecma_object_t *obj_p);
 ecma_collection_t *ecma_op_object_enumerate (ecma_object_t *obj_p);
 
 lit_magic_string_id_t ecma_object_get_class_name (ecma_object_t *obj_p);
-bool ecma_object_class_is (ecma_object_t *object_p, uint32_t class_id);
+#if JERRY_BUILTIN_REGEXP
 bool ecma_object_is_regexp_object (ecma_value_t arg);
-#if ENABLED (JERRY_ESNEXT)
+#endif /* JERRY_BUILTIN_REGEXP */
+#if JERRY_ESNEXT
 ecma_value_t ecma_op_is_concat_spreadable (ecma_value_t arg);
 ecma_value_t ecma_op_is_regexp (ecma_value_t arg);
 ecma_value_t ecma_op_species_constructor (ecma_object_t *this_value, ecma_builtin_id_t default_constructor_id);
 ecma_value_t ecma_op_invoke_by_symbol_id (ecma_value_t object, lit_magic_string_id_t magic_string_id,
                                           ecma_value_t *args_p, uint32_t args_len);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
+#if JERRY_BUILTIN_WEAKREF || JERRY_BUILTIN_WEAKSET || JERRY_BUILTIN_WEAKMAP
+void ecma_op_object_set_weak (ecma_object_t *object_p, ecma_object_t *target_p);
+void ecma_op_object_unref_weak (ecma_object_t *object_p, ecma_value_t ref_holder);
+#endif /* JERRY_BUILTIN_WEAKREF || JERRY_BUILTIN_WEAKSET || JERRY_BUILTIN_WEAKMAP */
 ecma_value_t ecma_op_invoke (ecma_value_t object, ecma_string_t *property_name_p, ecma_value_t *args_p,
                              uint32_t args_len);
 ecma_value_t ecma_op_invoke_by_magic_id (ecma_value_t object, lit_magic_string_id_t magic_string_id,
@@ -88,11 +125,11 @@ ecma_value_t ecma_op_ordinary_object_set_prototype_of (ecma_object_t *base_p, ec
 bool JERRY_ATTR_PURE ecma_op_ordinary_object_is_extensible (ecma_object_t *object_p);
 void ecma_op_ordinary_object_prevent_extensions (ecma_object_t *object_p);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
 ecma_value_t ecma_op_get_own_property_descriptor (ecma_value_t target,
                                                   ecma_string_t *property_name_p,
                                                   ecma_property_descriptor_t *prop_desc_p);
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
 /**
  * @}

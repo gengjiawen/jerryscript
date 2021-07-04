@@ -36,7 +36,7 @@
  * @{
  */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 /**
  * SetFunctionName operation
  *
@@ -86,7 +86,7 @@ ecma_op_function_form_name (ecma_string_t *prop_name_p, /**< property name */
 
   return ecma_make_string_value (prop_name_p);
 } /* ecma_op_function_form_name */
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * IsCallable operation.
@@ -96,19 +96,19 @@ ecma_op_function_form_name (ecma_string_t *prop_name_p, /**< property name */
  * @return true - if the given object is callable;
  *         false - otherwise
  */
-inline bool JERRY_ATTR_ALWAYS_INLINE
+extern inline bool JERRY_ATTR_ALWAYS_INLINE
 ecma_op_object_is_callable (ecma_object_t *obj_p) /**< ecma object */
 {
   JERRY_ASSERT (!ecma_is_lexical_environment (obj_p));
 
   const ecma_object_type_t type = ecma_get_object_type (obj_p);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
   if (ECMA_OBJECT_TYPE_IS_PROXY (type))
   {
-    return ECMA_GET_FIRST_BIT_FROM_POINTER_TAG (obj_p->u1.property_list_cp) != 0;
+    return (obj_p->u2.prototype_cp & ECMA_PROXY_IS_CALLABLE) != 0;
   }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
   return type >= ECMA_OBJECT_TYPE_FUNCTION;
 } /* ecma_op_object_is_callable */
@@ -144,7 +144,7 @@ ecma_object_check_constructor (ecma_object_t *obj_p) /**< ecma object */
 
   if (JERRY_UNLIKELY (type < ECMA_OBJECT_TYPE_PROXY))
   {
-    return ECMA_ERR_MSG ("Invalid type for constructor call.");
+    return ECMA_ERR_MSG ("Invalid type for constructor call");
   }
 
   while (JERRY_UNLIKELY (type == ECMA_OBJECT_TYPE_BOUND_FUNCTION))
@@ -161,68 +161,68 @@ ecma_object_check_constructor (ecma_object_t *obj_p) /**< ecma object */
   {
     JERRY_ASSERT (!ecma_get_object_is_builtin (obj_p));
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
     const ecma_compiled_code_t *byte_code_p = ecma_op_function_get_compiled_code ((ecma_extended_object_t *) obj_p);
 
     if (!CBC_FUNCTION_IS_CONSTRUCTABLE (byte_code_p->status_flags))
     {
-#if ENABLED (JERRY_ERROR_MESSAGES)
+#if JERRY_ERROR_MESSAGES
       switch (CBC_FUNCTION_GET_TYPE (byte_code_p->status_flags))
       {
         case CBC_FUNCTION_SCRIPT:
         {
-          return "Script (global) functions cannot be invoked with 'new'.";
+          return "Script (global) functions cannot be invoked with 'new'";
         }
         case CBC_FUNCTION_GENERATOR:
         {
-          return "Generator functions cannot be invoked with 'new'.";
+          return "Generator functions cannot be invoked with 'new'";
         }
         case CBC_FUNCTION_ASYNC:
         {
-          return "Async functions cannot be invoked with 'new'.";
+          return "Async functions cannot be invoked with 'new'";
         }
         case CBC_FUNCTION_ASYNC_GENERATOR:
         {
-          return "Async generator functions cannot be invoked with 'new'.";
+          return "Async generator functions cannot be invoked with 'new'";
         }
         case CBC_FUNCTION_ACCESSOR:
         {
-          return "Accessor functions cannot be invoked with 'new'.";
+          return "Accessor functions cannot be invoked with 'new'";
         }
         case CBC_FUNCTION_METHOD:
         {
-          return "Methods cannot be invoked with 'new'.";
+          return "Methods cannot be invoked with 'new'";
         }
         case CBC_FUNCTION_ARROW:
         {
-          return "Arrow functions cannot be invoked with 'new'.";
+          return "Arrow functions cannot be invoked with 'new'";
         }
         default:
         {
           JERRY_ASSERT (CBC_FUNCTION_GET_TYPE (byte_code_p->status_flags) == CBC_FUNCTION_ASYNC_ARROW);
-          return "Async arrow functions cannot be invoked with 'new'.";
+          return "Async arrow functions cannot be invoked with 'new'";
         }
       }
-#else /* !ENABLED (JERRY_ERROR_MESSAGES) */
+#else /* !JERRY_ERROR_MESSAGES */
       return NULL;
-#endif /* ENABLED (JERRY_ERROR_MESSAGES) */
+#endif /* JERRY_ERROR_MESSAGES */
     }
-#endif /* ENABLED (JERRY_NEXT) */
+#endif /* JERRY_NEXT */
 
     return ECMA_IS_VALID_CONSTRUCTOR;
   }
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
   if (ECMA_OBJECT_TYPE_IS_PROXY (type))
   {
-    if (ECMA_GET_SECOND_BIT_FROM_POINTER_TAG (obj_p->u1.property_list_cp) == 0)
+    if (!(obj_p->u2.prototype_cp & ECMA_PROXY_IS_CONSTRUCTABLE))
     {
-      return ECMA_ERR_MSG ("Proxy target is not a constructor.");
+      return ECMA_ERR_MSG ("Proxy target is not a constructor");
     }
 
     return ECMA_IS_VALID_CONSTRUCTOR;
   }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
   JERRY_ASSERT (type == ECMA_OBJECT_TYPE_NATIVE_FUNCTION);
 
@@ -230,12 +230,12 @@ ecma_object_check_constructor (ecma_object_t *obj_p) /**< ecma object */
   {
     if (ecma_builtin_function_is_routine (obj_p))
     {
-      return ECMA_ERR_MSG ("Built-in routines are not constructors.");
+      return ECMA_ERR_MSG ("Built-in routines have no constructor");
     }
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
     JERRY_ASSERT (((ecma_extended_object_t *) obj_p)->u.built_in.id != ECMA_BUILTIN_ID_HANDLER);
-#endif /* !ENABLED (JERRY_ESNEXT) */
+#endif /* !JERRY_ESNEXT */
   }
 
   return ECMA_IS_VALID_CONSTRUCTOR;
@@ -247,12 +247,12 @@ ecma_object_check_constructor (ecma_object_t *obj_p) /**< ecma object */
  * @return ECMA_IS_VALID_CONSTRUCTOR - if the input value is a constructor.
  *         any other value - if the input value is not a valid constructor, the pointer contains the error message.
  */
-inline char *JERRY_ATTR_ALWAYS_INLINE
+extern inline char *JERRY_ATTR_ALWAYS_INLINE
 ecma_check_constructor (ecma_value_t value) /**< ecma object */
 {
   if (!ecma_is_value_object (value))
   {
-    return ECMA_ERR_MSG ("Invalid type for constructor call.");
+    return ECMA_ERR_MSG ("Invalid type for constructor call");
   }
 
   return ecma_object_check_constructor (ecma_get_object_from_value (value));
@@ -264,7 +264,7 @@ ecma_check_constructor (ecma_value_t value) /**< ecma object */
  * @return true - if the given object is constructor;
  *         false - otherwise
  */
-inline bool JERRY_ATTR_ALWAYS_INLINE
+extern inline bool JERRY_ATTR_ALWAYS_INLINE
 ecma_object_is_constructor (ecma_object_t *obj_p) /**< ecma object */
 {
   return ecma_object_check_constructor (obj_p) == ECMA_IS_VALID_CONSTRUCTOR;
@@ -356,12 +356,12 @@ ecma_op_create_function_object (ecma_object_t *scope_p, /**< function's scope */
 
   size_t function_object_size = sizeof (ecma_extended_object_t);
 
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
+#if JERRY_SNAPSHOT_EXEC
   if (bytecode_data_p->status_flags & CBC_CODE_FLAGS_STATIC_FUNCTION)
   {
     function_object_size = sizeof (ecma_static_function_t);
   }
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+#endif /* JERRY_SNAPSHOT_EXEC */
 
   ecma_object_t *func_p = ecma_create_object (prototype_obj_p,
                                               function_object_size,
@@ -388,14 +388,14 @@ ecma_op_create_function_object (ecma_object_t *scope_p, /**< function's scope */
 
   /* 10., 11., 12. */
 
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
+#if JERRY_SNAPSHOT_EXEC
   if (bytecode_data_p->status_flags & CBC_CODE_FLAGS_STATIC_FUNCTION)
   {
     ext_func_p->u.function.bytecode_cp = JMEM_CP_NULL;
     ((ecma_static_function_t *) func_p)->bytecode_p = bytecode_data_p;
   }
   else
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+#endif /* JERRY_SNAPSHOT_EXEC */
   {
     ECMA_SET_INTERNAL_VALUE_POINTER (ext_func_p->u.function.bytecode_cp, bytecode_data_p);
     ecma_bytecode_ref ((ecma_compiled_code_t *) bytecode_data_p);
@@ -457,13 +457,12 @@ ecma_op_create_dynamic_function (const ecma_value_t *arguments_list_p, /**< argu
   ECMA_STRING_TO_UTF8_STRING (arguments_str_p, arguments_buffer_p, arguments_buffer_size);
   ECMA_STRING_TO_UTF8_STRING (function_body_str_p, function_body_buffer_p, function_body_buffer_size);
 
-  ecma_value_t resource_name = ecma_make_magic_string_value (LIT_MAGIC_STRING_RESOURCE_ANON);
   ecma_compiled_code_t *bytecode_p = parser_parse_script (arguments_buffer_p,
                                                           arguments_buffer_size,
                                                           function_body_buffer_p,
                                                           function_body_buffer_size,
-                                                          resource_name,
-                                                          parse_opts);
+                                                          parse_opts,
+                                                          NULL);
 
   ECMA_FINALIZE_UTF8_STRING (function_body_buffer_p, function_body_buffer_size);
   ECMA_FINALIZE_UTF8_STRING (arguments_buffer_p, arguments_buffer_size);
@@ -475,45 +474,45 @@ ecma_op_create_dynamic_function (const ecma_value_t *arguments_list_p, /**< argu
     return ECMA_VALUE_ERROR;
   }
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   ecma_value_t *func_name_p;
   func_name_p = ecma_compiled_code_resolve_function_name ((const ecma_compiled_code_t *) bytecode_p);
   *func_name_p = ecma_make_magic_string_value (LIT_MAGIC_STRING_ANONYMOUS);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   ecma_object_t *global_object_p = ecma_builtin_get_global ();
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
-  JERRY_ASSERT (global_object_p == ecma_get_object_from_value (ecma_op_function_get_realm (bytecode_p)));
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#if JERRY_BUILTIN_REALMS
+  JERRY_ASSERT (global_object_p == (ecma_object_t *) ecma_op_function_get_realm (bytecode_p));
+#endif /* JERRY_BUILTIN_REALMS */
 
   ecma_object_t *global_env_p = ecma_get_global_environment (global_object_p);
   ecma_builtin_id_t fallback_proto = ECMA_BUILTIN_ID_FUNCTION_PROTOTYPE;
 
-#if ENABLED (JERRY_ESNEXT)
-  ecma_object_t *new_target_p = JERRY_CONTEXT (current_new_target);
+#if JERRY_ESNEXT
+  ecma_object_t *new_target_p = JERRY_CONTEXT (current_new_target_p);
+  ecma_builtin_id_t fallback_ctor = ECMA_BUILTIN_ID_FUNCTION;
 
   if (JERRY_UNLIKELY (parse_opts & (ECMA_PARSE_GENERATOR_FUNCTION | ECMA_PARSE_ASYNC_FUNCTION)))
   {
-    fallback_proto = ECMA_BUILTIN_ID_GENERATOR;
+    fallback_proto = ECMA_BUILTIN_ID_ASYNC_GENERATOR;
+    fallback_ctor = ECMA_BUILTIN_ID_ASYNC_GENERATOR_FUNCTION;
 
-    if (parse_opts & ECMA_PARSE_ASYNC_FUNCTION)
+    if (!(parse_opts & ECMA_PARSE_GENERATOR_FUNCTION))
     {
-      fallback_proto = ECMA_BUILTIN_ID_ASYNC_GENERATOR;
-
-      if (new_target_p == NULL)
-      {
-        new_target_p = ecma_builtin_get (ECMA_BUILTIN_ID_ASYNC_GENERATOR_FUNCTION);
-      }
+      fallback_proto = ECMA_BUILTIN_ID_ASYNC_FUNCTION_PROTOTYPE;
+      fallback_ctor = ECMA_BUILTIN_ID_ASYNC_FUNCTION;
     }
-    else if (new_target_p == NULL)
+    else if (!(parse_opts & ECMA_PARSE_ASYNC_FUNCTION))
     {
-      new_target_p = ecma_builtin_get (ECMA_BUILTIN_ID_GENERATOR_FUNCTION);
+      fallback_proto = ECMA_BUILTIN_ID_GENERATOR;
+      fallback_ctor = ECMA_BUILTIN_ID_GENERATOR_FUNCTION;
     }
   }
-  else if (new_target_p == NULL)
+
+  if (new_target_p == NULL)
   {
-    new_target_p = ecma_builtin_get (ECMA_BUILTIN_ID_FUNCTION);
+    new_target_p = ecma_builtin_get (fallback_ctor);
   }
 
   ecma_object_t *proto = ecma_op_get_prototype_from_constructor (new_target_p, fallback_proto);
@@ -523,14 +522,14 @@ ecma_op_create_dynamic_function (const ecma_value_t *arguments_list_p, /**< argu
     ecma_bytecode_deref (bytecode_p);
     return ECMA_VALUE_ERROR;
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   ecma_object_t *func_obj_p = ecma_op_create_function_object (global_env_p, bytecode_p, fallback_proto);
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   ECMA_SET_NON_NULL_POINTER (func_obj_p->u2.prototype_cp, proto);
   ecma_deref_object (proto);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   ecma_bytecode_deref (bytecode_p);
   return ecma_make_object_value (func_obj_p);
@@ -550,7 +549,7 @@ ecma_op_create_simple_function_object (ecma_object_t *scope_p, /**< function's s
   return ecma_op_create_function_object (scope_p, bytecode_data_p, ECMA_BUILTIN_ID_FUNCTION_PROTOTYPE);
 } /* ecma_op_create_simple_function_object */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 /**
  * Create a function object with the appropriate prototype.
@@ -616,12 +615,12 @@ ecma_op_create_arrow_function_object (ecma_object_t *scope_p, /**< function's sc
 
   size_t arrow_function_object_size = sizeof (ecma_arrow_function_t);
 
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
+#if JERRY_SNAPSHOT_EXEC
   if (bytecode_data_p->status_flags & CBC_CODE_FLAGS_STATIC_FUNCTION)
   {
     arrow_function_object_size = sizeof (ecma_static_arrow_function_t);
   }
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+#endif /* JERRY_SNAPSHOT_EXEC */
 
   ecma_object_t *func_p = ecma_create_object (prototype_obj_p,
                                               arrow_function_object_size,
@@ -631,7 +630,7 @@ ecma_op_create_arrow_function_object (ecma_object_t *scope_p, /**< function's sc
 
   ECMA_SET_NON_NULL_POINTER_TAG (arrow_func_p->header.u.function.scope_cp, scope_p, 0);
 
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
+#if JERRY_SNAPSHOT_EXEC
   if ((bytecode_data_p->status_flags & CBC_CODE_FLAGS_STATIC_FUNCTION))
   {
     arrow_func_p->header.u.function.bytecode_cp = ECMA_NULL_POINTER;
@@ -639,24 +638,24 @@ ecma_op_create_arrow_function_object (ecma_object_t *scope_p, /**< function's sc
   }
   else
   {
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+#endif /* JERRY_SNAPSHOT_EXEC */
     ECMA_SET_INTERNAL_VALUE_POINTER (arrow_func_p->header.u.function.bytecode_cp, bytecode_data_p);
     ecma_bytecode_ref ((ecma_compiled_code_t *) bytecode_data_p);
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
+#if JERRY_SNAPSHOT_EXEC
   }
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+#endif /* JERRY_SNAPSHOT_EXEC */
 
   arrow_func_p->this_binding = ecma_copy_value_if_not_object (this_binding);
   arrow_func_p->new_target = ECMA_VALUE_UNDEFINED;
 
-  if (JERRY_CONTEXT (current_new_target) != NULL)
+  if (JERRY_CONTEXT (current_new_target_p) != NULL)
   {
-    arrow_func_p->new_target = ecma_make_object_value (JERRY_CONTEXT (current_new_target));
+    arrow_func_p->new_target = ecma_make_object_value (JERRY_CONTEXT (current_new_target_p));
   }
   return func_p;
 } /* ecma_op_create_arrow_function_object */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * External function object creation operation.
@@ -672,10 +671,9 @@ ecma_op_create_external_function_object (ecma_native_handler_t handler_cb) /**< 
 {
   ecma_object_t *prototype_obj_p = ecma_builtin_get (ECMA_BUILTIN_ID_FUNCTION_PROTOTYPE);
 
-  ecma_object_t *function_obj_p;
-  function_obj_p = ecma_create_object (prototype_obj_p,
-                                       sizeof (ecma_extended_object_t),
-                                       ECMA_OBJECT_TYPE_NATIVE_FUNCTION);
+  ecma_object_t *function_obj_p = ecma_create_object (prototype_obj_p,
+                                                      sizeof (ecma_native_function_t),
+                                                      ECMA_OBJECT_TYPE_NATIVE_FUNCTION);
 
   /*
    * [[Class]] property is not stored explicitly for objects of ECMA_OBJECT_TYPE_NATIVE_FUNCTION type.
@@ -683,13 +681,17 @@ ecma_op_create_external_function_object (ecma_native_handler_t handler_cb) /**< 
    * See also: ecma_object_get_class_name
    */
 
-  ecma_extended_object_t *ext_func_obj_p = (ecma_extended_object_t *) function_obj_p;
-  ext_func_obj_p->u.external_handler_cb = handler_cb;
+  ecma_native_function_t *native_function_p = (ecma_native_function_t *) function_obj_p;
+#if JERRY_BUILTIN_REALMS
+  ECMA_SET_INTERNAL_VALUE_POINTER (native_function_p->realm_value,
+                                   ecma_builtin_get_global ());
+#endif /* JERRY_BUILTIN_REALMS */
+  native_function_p->native_handler_cb = handler_cb;
 
   return function_obj_p;
 } /* ecma_op_create_external_function_object */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 /**
  * Create built-in native handler object.
@@ -712,25 +714,25 @@ ecma_op_create_native_handler (ecma_native_handler_id_t id, /**< handler id */
   ext_func_obj_p->u.built_in.routine_id = (uint8_t) id;
   ext_func_obj_p->u.built_in.u2.routine_flags = ECMA_NATIVE_HANDLER_FLAGS_NONE;
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
   ECMA_SET_INTERNAL_VALUE_POINTER (ext_func_obj_p->u.built_in.realm_value,
                                    ecma_builtin_get_global ());
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_BUILTIN_REALMS */
 
   return function_obj_p;
 } /* ecma_op_create_native_handler */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * Get compiled code of a function object.
  *
  * @return compiled code
  */
-inline const ecma_compiled_code_t * JERRY_ATTR_ALWAYS_INLINE
+extern inline const ecma_compiled_code_t * JERRY_ATTR_ALWAYS_INLINE
 ecma_op_function_get_compiled_code (ecma_extended_object_t *function_p) /**< function pointer */
 {
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
+#if JERRY_SNAPSHOT_EXEC
   if (JERRY_LIKELY (function_p->u.function.bytecode_cp != ECMA_NULL_POINTER))
   {
     return ECMA_GET_INTERNAL_VALUE_POINTER (const ecma_compiled_code_t,
@@ -738,13 +740,13 @@ ecma_op_function_get_compiled_code (ecma_extended_object_t *function_p) /**< fun
   }
 
   return ((ecma_static_function_t *) function_p)->bytecode_p;
-#else /* !ENABLED (JERRY_SNAPSHOT_EXEC) */
+#else /* !JERRY_SNAPSHOT_EXEC */
   return ECMA_GET_INTERNAL_VALUE_POINTER (const ecma_compiled_code_t,
                                           function_p->u.function.bytecode_cp);
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+#endif /* JERRY_SNAPSHOT_EXEC */
 } /* ecma_op_function_get_compiled_code */
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
 
 /**
  * Get realm from a byte code.
@@ -752,9 +754,9 @@ ecma_op_function_get_compiled_code (ecma_extended_object_t *function_p) /**< fun
  * Note:
  *   Does not increase the reference counter.
  *
- * @return realm (global) object
+ * @return pointer to realm (global) object
  */
-inline ecma_value_t JERRY_ATTR_ALWAYS_INLINE
+extern inline ecma_global_object_t * JERRY_ATTR_ALWAYS_INLINE
 ecma_op_function_get_realm (const ecma_compiled_code_t *bytecode_header_p) /**< byte code header */
 {
   ecma_value_t realm_value;
@@ -770,19 +772,73 @@ ecma_op_function_get_realm (const ecma_compiled_code_t *bytecode_header_p) /**< 
     realm_value = args_p->realm_value;
   }
 
-#if ENABLED (JERRY_SNAPSHOT_EXEC)
-  if (JERRY_LIKELY (realm_value != ECMA_VALUE_UNDEFINED))
+#if JERRY_SNAPSHOT_EXEC
+  if (JERRY_LIKELY (realm_value != JMEM_CP_NULL))
   {
-    return realm_value;
+    return ECMA_GET_INTERNAL_VALUE_POINTER (ecma_global_object_t, realm_value);
   }
 
-  return ecma_make_object_value (ecma_builtin_get_global ());
-#else /* !ENABLED (JERRY_SNAPSHOT_EXEC) */
-  return realm_value;
-#endif /* ENABLED (JERRY_SNAPSHOT_EXEC) */
+  return (ecma_global_object_t *) ecma_builtin_get_global ();
+#else /* !JERRY_SNAPSHOT_EXEC */
+  return ECMA_GET_INTERNAL_VALUE_POINTER (ecma_global_object_t, realm_value);
+#endif /* JERRY_SNAPSHOT_EXEC */
 } /* ecma_op_function_get_realm */
 
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+/**
+ * Get realm from a function
+ *
+ * Note:
+ *   Does not increase the reference counter.
+ *
+ * @return realm (global) object
+ */
+ecma_global_object_t *
+ecma_op_function_get_function_realm (ecma_object_t *func_obj_p) /**< function object */
+{
+  while (true)
+  {
+    if (ecma_get_object_type (func_obj_p) == ECMA_OBJECT_TYPE_FUNCTION)
+    {
+      ecma_extended_object_t *ext_function_obj_p = (ecma_extended_object_t *) func_obj_p;
+      const ecma_compiled_code_t *bytecode_data_p = ecma_op_function_get_compiled_code (ext_function_obj_p);
+      return ecma_op_function_get_realm (bytecode_data_p);
+    }
+
+    if (ecma_get_object_type (func_obj_p) == ECMA_OBJECT_TYPE_NATIVE_FUNCTION)
+    {
+      if (ecma_get_object_is_builtin (func_obj_p))
+      {
+        ecma_extended_object_t *ext_function_obj_p = (ecma_extended_object_t *) func_obj_p;
+        return ECMA_GET_INTERNAL_VALUE_POINTER (ecma_global_object_t,
+                                                ext_function_obj_p->u.built_in.realm_value);
+      }
+      ecma_native_function_t *native_function_p = (ecma_native_function_t *) func_obj_p;
+      return ECMA_GET_INTERNAL_VALUE_POINTER (ecma_global_object_t,
+                                              native_function_p->realm_value);
+    }
+
+  #if JERRY_BUILTIN_PROXY
+    if (ECMA_OBJECT_IS_PROXY (func_obj_p))
+    {
+      ecma_proxy_object_t *proxy_obj_p = (ecma_proxy_object_t *) func_obj_p;
+      if (ecma_is_value_null (proxy_obj_p->handler))
+      {
+        ecma_raise_type_error (ECMA_ERR_MSG ("Prototype from revoked Proxy is invalid"));
+        return NULL;
+      }
+      func_obj_p = ecma_get_object_from_value (proxy_obj_p->target);
+      continue;
+    }
+  #endif /* JERRY_BUILTIN_PROXY */
+
+    JERRY_ASSERT (ecma_get_object_type (func_obj_p) == ECMA_OBJECT_TYPE_BOUND_FUNCTION);
+    ecma_bound_function_t *bound_func_p = (ecma_bound_function_t *) func_obj_p;
+    func_obj_p = ECMA_GET_NON_NULL_POINTER_FROM_POINTER_TAG (ecma_object_t,
+                                                             bound_func_p->header.u.bound_function.target_function);
+  }
+} /* ecma_op_function_get_function_realm */
+
+#endif /* JERRY_BUILTIN_REALMS */
 
 /**
  * 15.3.5.3 implementation of [[HasInstance]] for Function objects
@@ -831,63 +887,53 @@ ecma_op_function_has_instance (ecma_object_t *func_obj_p, /**< Function object *
   if (!ecma_is_value_object (prototype_obj_value))
   {
     ecma_free_value (prototype_obj_value);
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Object expected."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Object expected"));
   }
 
   ecma_object_t *prototype_obj_p = ecma_get_object_from_value (prototype_obj_value);
   JERRY_ASSERT (prototype_obj_p != NULL);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
   ecma_value_t result = ECMA_VALUE_ERROR;
-#else /* !ENABLED (JERRY_BUILTIN_PROXY) */
+#else /* !JERRY_BUILTIN_PROXY */
   ecma_value_t result = ECMA_VALUE_FALSE;
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
+
+  ecma_ref_object (v_obj_p);
 
   while (true)
   {
-    jmem_cpointer_t v_obj_cp;
-#if ENABLED (JERRY_BUILTIN_PROXY)
-    if (ECMA_OBJECT_IS_PROXY (v_obj_p))
-    {
-      ecma_value_t parent = ecma_proxy_object_get_prototype_of (v_obj_p);
+    ecma_object_t *current_proto_p = ecma_op_object_get_prototype_of (v_obj_p);
+    ecma_deref_object (v_obj_p);
 
-      if (ECMA_IS_VALUE_ERROR (parent))
-      {
-        break;
-      }
-
-      v_obj_cp = ecma_proxy_object_prototype_to_cp (parent);
-    }
-    else
+    if (current_proto_p == NULL)
     {
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
-      v_obj_cp = ecma_op_ordinary_object_get_prototype_of (v_obj_p);
-#if ENABLED (JERRY_BUILTIN_PROXY)
-    }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
-
-    if (v_obj_cp == JMEM_CP_NULL)
-    {
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
       result = ECMA_VALUE_FALSE;
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
+      break;
+    }
+    else if (current_proto_p == ECMA_OBJECT_POINTER_ERROR)
+    {
       break;
     }
 
-    v_obj_p = ECMA_GET_NON_NULL_POINTER (ecma_object_t, v_obj_cp);
-
-    if (v_obj_p == prototype_obj_p)
+    if (current_proto_p == prototype_obj_p)
     {
+      ecma_deref_object (current_proto_p);
       result = ECMA_VALUE_TRUE;
       break;
     }
+
+    /* Advance up on prototype chain. */
+    v_obj_p = current_proto_p;
   }
 
   ecma_deref_object (prototype_obj_p);
   return result;
 } /* ecma_op_function_has_instance */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 /**
  * GetSuperConstructor operation for class methods
@@ -900,49 +946,24 @@ ecma_op_function_has_instance (ecma_object_t *func_obj_p, /**< Function object *
 ecma_value_t
 ecma_op_function_get_super_constructor (ecma_object_t *func_obj_p) /**< function object */
 {
-  ecma_object_t *super_ctor_p;
+  ecma_object_t *super_ctor_p = ecma_op_object_get_prototype_of (func_obj_p);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
-  if (ECMA_OBJECT_IS_PROXY (func_obj_p))
+  if (JERRY_UNLIKELY (super_ctor_p == ECMA_OBJECT_POINTER_ERROR))
   {
-    ecma_value_t super_ctor = ecma_proxy_object_get_prototype_of (func_obj_p);
-
-    if (ECMA_IS_VALUE_ERROR (super_ctor))
-    {
-      return super_ctor;
-    }
-
-    super_ctor_p = ecma_is_value_null (super_ctor) ? NULL : ecma_get_object_from_value (super_ctor);
+    return ECMA_VALUE_ERROR;
   }
-  else
-  {
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
-    jmem_cpointer_t proto_cp = ecma_op_ordinary_object_get_prototype_of (func_obj_p);
-    if (proto_cp == JMEM_CP_NULL)
-    {
-      super_ctor_p = NULL;
-    }
-    else
-    {
-      super_ctor_p = ECMA_GET_NON_NULL_POINTER (ecma_object_t, proto_cp);
-      ecma_ref_object (super_ctor_p);
-    }
-#if ENABLED (JERRY_BUILTIN_PROXY)
-  }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
-
-  if (super_ctor_p == NULL || !ecma_object_is_constructor (super_ctor_p))
+  else if (super_ctor_p == NULL || !ecma_object_is_constructor (super_ctor_p))
   {
     if (super_ctor_p != NULL)
     {
       ecma_deref_object (super_ctor_p);
     }
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Super binding must be a constructor."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Super binding must be a constructor"));
   }
 
   return ecma_make_object_value (super_ctor_p);
 } /* ecma_op_function_get_super_constructor */
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * Ordinary internal method: GetPrototypeFromConstructor (constructor, intrinsicDefaultProto)
@@ -974,19 +995,23 @@ ecma_op_get_prototype_from_constructor (ecma_object_t *ctor_obj_p, /**< construc
   {
     ecma_free_value (proto);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
     if (ECMA_OBJECT_IS_PROXY (ctor_obj_p))
     {
       ecma_proxy_object_t *proxy_obj_p = (ecma_proxy_object_t *) ctor_obj_p;
       if (ecma_is_value_null (proxy_obj_p->handler))
       {
-        ecma_raise_type_error (ECMA_ERR_MSG ("Prototype from revoked Proxy is invalid."));
+        ecma_raise_type_error (ECMA_ERR_MSG ("Prototype from revoked Proxy is invalid"));
         return NULL;
       }
     }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
+#if JERRY_BUILTIN_REALMS
+    proto_obj_p = ecma_builtin_get_from_realm (ecma_op_function_get_function_realm (ctor_obj_p), default_proto_id);
+#else /* !JERRY_BUILTIN_REALMS */
     proto_obj_p = ecma_builtin_get (default_proto_id);
+#endif /* JERRY_BUILTIN_REALMS */
     ecma_ref_object (proto_obj_p);
   }
   else
@@ -1015,7 +1040,7 @@ ecma_op_function_call_simple (ecma_object_t *func_obj_p, /**< Function object */
 
   vm_frame_ctx_shared_args_t shared_args;
   shared_args.header.status_flags = VM_FRAME_CTX_SHARED_HAS_ARG_LIST;
-  shared_args.function_object_p = func_obj_p;
+  shared_args.header.function_object_p = func_obj_p;
   shared_args.arg_list_p = arguments_list_p;
   shared_args.arg_list_len = arguments_list_len;
 
@@ -1033,30 +1058,30 @@ ecma_op_function_call_simple (ecma_object_t *func_obj_p, /**< Function object */
 
   shared_args.header.bytecode_header_p = bytecode_data_p;
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
-  ecma_value_t realm_value = ecma_op_function_get_realm (bytecode_data_p);
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#if JERRY_BUILTIN_REALMS
+  ecma_global_object_t *realm_p = ecma_op_function_get_realm (bytecode_data_p);
+#endif /* JERRY_BUILTIN_REALMS */
 
   /* 1. */
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   if (JERRY_UNLIKELY (CBC_FUNCTION_IS_ARROW (status_flags)))
   {
     ecma_arrow_function_t *arrow_func_p = (ecma_arrow_function_t *) func_obj_p;
 
     if (ecma_is_value_undefined (arrow_func_p->new_target))
     {
-      JERRY_CONTEXT (current_new_target) = NULL;
+      JERRY_CONTEXT (current_new_target_p) = NULL;
     }
     else
     {
-      JERRY_CONTEXT (current_new_target) = ecma_get_object_from_value (arrow_func_p->new_target);
+      JERRY_CONTEXT (current_new_target_p) = ecma_get_object_from_value (arrow_func_p->new_target);
     }
     this_binding = arrow_func_p->this_binding;
   }
   else
   {
     shared_args.header.status_flags |= VM_FRAME_CTX_SHARED_NON_ARROW_FUNC;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
     if (!(status_flags & CBC_CODE_FLAGS_STRICT_MODE))
     {
@@ -1064,11 +1089,11 @@ ecma_op_function_call_simple (ecma_object_t *func_obj_p, /**< Function object */
           || ecma_is_value_null (this_binding))
       {
         /* 2. */
-#if ENABLED (JERRY_BUILTIN_REALMS)
-        this_binding = realm_value;
-#else /* !ENABLED (JERRY_BUILTIN_REALMS) */
+#if JERRY_BUILTIN_REALMS
+        this_binding = realm_p->this_binding;
+#else /* !JERRY_BUILTIN_REALMS */
         this_binding = ecma_make_object_value (ecma_builtin_get_global ());
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_BUILTIN_REALMS */
       }
       else if (!ecma_is_value_object (this_binding))
       {
@@ -1079,9 +1104,9 @@ ecma_op_function_call_simple (ecma_object_t *func_obj_p, /**< Function object */
         JERRY_ASSERT (!ECMA_IS_VALUE_ERROR (this_binding));
       }
     }
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   /* 5. */
   if (!(status_flags & CBC_CODE_FLAGS_LEXICAL_ENV_NOT_NEEDED))
@@ -1092,12 +1117,12 @@ ecma_op_function_call_simple (ecma_object_t *func_obj_p, /**< Function object */
 
   ecma_value_t ret_value;
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   if (JERRY_UNLIKELY (CBC_FUNCTION_GET_TYPE (status_flags) == CBC_FUNCTION_CONSTRUCTOR))
   {
-    if (JERRY_CONTEXT (current_new_target) == NULL)
+    if (JERRY_CONTEXT (current_new_target_p) == NULL)
     {
-      ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Class constructor cannot be invoked without 'new'."));
+      ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Class constructor requires 'new'"));
       goto exit;
     }
 
@@ -1111,20 +1136,20 @@ ecma_op_function_call_simple (ecma_object_t *func_obj_p, /**< Function object */
 
     ecma_op_create_environment_record (scope_p, lexical_this, func_obj_p);
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
   ecma_global_object_t *saved_global_object_p = JERRY_CONTEXT (global_object_p);
-  JERRY_CONTEXT (global_object_p) = (ecma_global_object_t *) ecma_get_object_from_value (realm_value);
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+  JERRY_CONTEXT (global_object_p) = realm_p;
+#endif /* JERRY_BUILTIN_REALMS */
 
   ret_value = vm_run (&shared_args.header, this_binding, scope_p);
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
   JERRY_CONTEXT (global_object_p) = saved_global_object_p;
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_BUILTIN_REALMS */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   /* ECMAScript v6, 9.2.2.13 */
   if (JERRY_UNLIKELY (shared_args.header.status_flags & VM_FRAME_CTX_SHARED_HERITAGE_PRESENT))
   {
@@ -1133,7 +1158,7 @@ ecma_op_function_call_simple (ecma_object_t *func_obj_p, /**< Function object */
       if (!ecma_is_value_undefined (ret_value))
       {
         ecma_free_value (ret_value);
-        ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Derived constructors may only return object or undefined."));
+        ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Derived constructors may only return object or undefined"));
       }
       else
       {
@@ -1143,7 +1168,7 @@ ecma_op_function_call_simple (ecma_object_t *func_obj_p, /**< Function object */
   }
 
 exit:
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   if (JERRY_UNLIKELY (shared_args.header.status_flags & VM_FRAME_CTX_SHARED_FREE_LOCAL_ENV))
   {
@@ -1171,41 +1196,64 @@ ecma_op_function_call_native (ecma_object_t *func_obj_p, /**< Function object */
 
 {
   JERRY_ASSERT (ecma_get_object_type (func_obj_p) == ECMA_OBJECT_TYPE_NATIVE_FUNCTION);
-  ecma_extended_object_t *ext_func_obj_p = (ecma_extended_object_t *) func_obj_p;
 
   if (ecma_get_object_is_builtin (func_obj_p))
   {
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
     ecma_global_object_t *saved_global_object_p = JERRY_CONTEXT (global_object_p);
-    ecma_value_t realm_value = ((ecma_extended_object_t *) func_obj_p)->u.built_in.realm_value;
-    JERRY_CONTEXT (global_object_p) = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_global_object_t, realm_value);
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+
+    ecma_extended_object_t *ext_func_obj_p = (ecma_extended_object_t *) func_obj_p;
+    JERRY_CONTEXT (global_object_p) = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_global_object_t,
+                                                                       ext_func_obj_p->u.built_in.realm_value);
+#endif /* JERRY_BUILTIN_REALMS */
 
     ecma_value_t ret_value = ecma_builtin_dispatch_call (func_obj_p,
                                                          this_arg_value,
                                                          arguments_list_p,
                                                          arguments_list_len);
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
     JERRY_CONTEXT (global_object_p) = saved_global_object_p;
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_BUILTIN_REALMS */
     return ret_value;
   }
 
-  JERRY_ASSERT (ext_func_obj_p->u.external_handler_cb != NULL);
-  ecma_value_t ret_value = ext_func_obj_p->u.external_handler_cb (ecma_make_object_value (func_obj_p),
-                                                                  this_arg_value,
-                                                                  arguments_list_p,
-                                                                  arguments_list_len);
+  ecma_native_function_t *native_function_p = (ecma_native_function_t *) func_obj_p;
+
+#if JERRY_BUILTIN_REALMS
+  ecma_global_object_t *saved_global_object_p = JERRY_CONTEXT (global_object_p);
+  JERRY_CONTEXT (global_object_p) = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_global_object_t,
+                                                                     native_function_p->realm_value);
+#endif /* JERRY_BUILTIN_REALMS */
+
+  jerry_call_info_t call_info;
+  call_info.function = ecma_make_object_value (func_obj_p);
+  call_info.this_value = this_arg_value;
+
+#if JERRY_ESNEXT
+  ecma_object_t *new_target_p = JERRY_CONTEXT (current_new_target_p);
+  call_info.new_target = (new_target_p == NULL) ? ECMA_VALUE_UNDEFINED : ecma_make_object_value (new_target_p);
+#else /* JERRY_ESNEXT */
+  call_info.new_target = ECMA_VALUE_UNDEFINED;
+#endif /* JERRY_ESNEXT */
+
+  JERRY_ASSERT (native_function_p->native_handler_cb != NULL);
+  ecma_value_t ret_value = native_function_p->native_handler_cb (&call_info,
+                                                                 arguments_list_p,
+                                                                 arguments_list_len);
+#if JERRY_BUILTIN_REALMS
+  JERRY_CONTEXT (global_object_p) = saved_global_object_p;
+#endif /* JERRY_BUILTIN_REALMS */
+
   if (JERRY_UNLIKELY (ecma_is_value_error_reference (ret_value)))
   {
     ecma_raise_error_from_error_reference (ret_value);
     return ECMA_VALUE_ERROR;
   }
 
-#if ENABLED (JERRY_DEBUGGER)
+#if JERRY_DEBUGGER
   JERRY_DEBUGGER_CLEAR_FLAGS (JERRY_DEBUGGER_VM_EXCEPTION_THROWN);
-#endif /* ENABLED (JERRY_DEBUGGER) */
+#endif /* JERRY_DEBUGGER */
   return ret_value;
 } /* ecma_op_function_call_native */
 
@@ -1316,20 +1364,20 @@ ecma_op_function_call (ecma_object_t *func_obj_p, /**< Function object */
 
   const ecma_object_type_t type = ecma_get_object_type (func_obj_p);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
   if (ECMA_OBJECT_TYPE_IS_PROXY (type))
   {
     return ecma_proxy_object_call (func_obj_p, this_arg_value, arguments_list_p, arguments_list_len);
   }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
-#if ENABLED (JERRY_ESNEXT)
-  ecma_object_t *old_new_target_p = JERRY_CONTEXT (current_new_target);
+#if JERRY_ESNEXT
+  ecma_object_t *old_new_target_p = JERRY_CONTEXT (current_new_target_p);
   if (JERRY_UNLIKELY (!(JERRY_CONTEXT (status_flags) & ECMA_STATUS_DIRECT_EVAL)))
   {
-    JERRY_CONTEXT (current_new_target) = NULL;
+    JERRY_CONTEXT (current_new_target_p) = NULL;
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   ecma_value_t result;
 
@@ -1346,9 +1394,9 @@ ecma_op_function_call (ecma_object_t *func_obj_p, /**< Function object */
     result = ecma_op_function_call_bound (func_obj_p, arguments_list_p, arguments_list_len);
   }
 
-#if ENABLED (JERRY_ESNEXT)
-  JERRY_CONTEXT (current_new_target) = old_new_target_p;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#if JERRY_ESNEXT
+  JERRY_CONTEXT (current_new_target_p) = old_new_target_p;
+#endif /* JERRY_ESNEXT */
 
   return result;
 } /* ecma_op_function_call */
@@ -1414,16 +1462,16 @@ ecma_op_function_construct_native (ecma_object_t *func_obj_p, /**< Function obje
   ecma_value_t this_arg = ecma_make_object_value (new_this_obj_p);
   ecma_deref_object (proto_p);
 
-#if ENABLED (JERRY_ESNEXT)
-  ecma_object_t *old_new_target_p = JERRY_CONTEXT (current_new_target);
-  JERRY_CONTEXT (current_new_target) = new_target_p;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#if JERRY_ESNEXT
+  ecma_object_t *old_new_target_p = JERRY_CONTEXT (current_new_target_p);
+  JERRY_CONTEXT (current_new_target_p) = new_target_p;
+#endif /* JERRY_ESNEXT */
 
   ecma_value_t ret_value = ecma_op_function_call_native (func_obj_p, this_arg, arguments_list_p, arguments_list_len);
 
-#if ENABLED (JERRY_ESNEXT)
-  JERRY_CONTEXT (current_new_target) = old_new_target_p;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#if JERRY_ESNEXT
+  JERRY_CONTEXT (current_new_target_p) = old_new_target_p;
+#endif /* JERRY_ESNEXT */
 
   if (ECMA_IS_VALUE_ERROR (ret_value) || ecma_is_value_object (ret_value))
   {
@@ -1455,7 +1503,7 @@ ecma_op_function_construct (ecma_object_t *func_obj_p, /**< Function object */
 
   const ecma_object_type_t type = ecma_get_object_type (func_obj_p);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
   if (ECMA_OBJECT_TYPE_IS_PROXY (type))
   {
     return ecma_proxy_object_construct (func_obj_p,
@@ -1463,7 +1511,7 @@ ecma_op_function_construct (ecma_object_t *func_obj_p, /**< Function object */
                                         arguments_list_p,
                                         arguments_list_len);
   }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
   if (JERRY_UNLIKELY (type == ECMA_OBJECT_TYPE_BOUND_FUNCTION))
   {
@@ -1474,26 +1522,26 @@ ecma_op_function_construct (ecma_object_t *func_obj_p, /**< Function object */
   {
     if (JERRY_UNLIKELY (ecma_get_object_is_builtin (func_obj_p)))
     {
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
       ecma_global_object_t *saved_global_object_p = JERRY_CONTEXT (global_object_p);
       ecma_value_t realm_value = ((ecma_extended_object_t *) func_obj_p)->u.built_in.realm_value;
       JERRY_CONTEXT (global_object_p) = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_global_object_t, realm_value);
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_BUILTIN_REALMS */
 
-#if ENABLED (JERRY_ESNEXT)
-      ecma_object_t *old_new_target = JERRY_CONTEXT (current_new_target);
-      JERRY_CONTEXT (current_new_target) = new_target_p;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#if JERRY_ESNEXT
+      ecma_object_t *old_new_target = JERRY_CONTEXT (current_new_target_p);
+      JERRY_CONTEXT (current_new_target_p) = new_target_p;
+#endif /* JERRY_ESNEXT */
 
       ecma_value_t ret_value = ecma_builtin_dispatch_construct (func_obj_p, arguments_list_p, arguments_list_len);
 
-#if ENABLED (JERRY_ESNEXT)
-      JERRY_CONTEXT (current_new_target) = old_new_target;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#if JERRY_ESNEXT
+      JERRY_CONTEXT (current_new_target_p) = old_new_target;
+#endif /* JERRY_ESNEXT */
 
-#if ENABLED (JERRY_BUILTIN_REALMS)
+#if JERRY_BUILTIN_REALMS
       JERRY_CONTEXT (global_object_p) = saved_global_object_p;
-#endif /* ENABLED (JERRY_BUILTIN_REALMS) */
+#endif /* JERRY_BUILTIN_REALMS */
       return ret_value;
     }
 
@@ -1506,13 +1554,13 @@ ecma_op_function_construct (ecma_object_t *func_obj_p, /**< Function object */
   ecma_object_t *new_this_obj_p = NULL;
   ecma_value_t this_arg;
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   ecma_extended_object_t *ext_func_obj_p = (ecma_extended_object_t *) func_obj_p;
 
   /* 5. */
   if (!ECMA_GET_THIRD_BIT_FROM_POINTER_TAG (ext_func_obj_p->u.function.scope_cp))
   {
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
     /* 5.a */
     ecma_object_t *proto_p = ecma_op_get_prototype_from_constructor (new_target_p, ECMA_BUILTIN_ID_OBJECT_PROTOTYPE);
 
@@ -1525,7 +1573,7 @@ ecma_op_function_construct (ecma_object_t *func_obj_p, /**< Function object */
     new_this_obj_p = ecma_create_object (proto_p, 0, ECMA_OBJECT_TYPE_GENERAL);
     ecma_deref_object (proto_p);
     this_arg = ecma_make_object_value (new_this_obj_p);
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   }
   else
   {
@@ -1533,27 +1581,27 @@ ecma_op_function_construct (ecma_object_t *func_obj_p, /**< Function object */
   }
 
   /* 6. */
-  ecma_object_t *old_new_target_p = JERRY_CONTEXT (current_new_target);
-  JERRY_CONTEXT (current_new_target) = new_target_p;
-#endif /* ENABLED (JERRY_ESNEXT) */
+  ecma_object_t *old_new_target_p = JERRY_CONTEXT (current_new_target_p);
+  JERRY_CONTEXT (current_new_target_p) = new_target_p;
+#endif /* JERRY_ESNEXT */
 
   ecma_value_t ret_value = ecma_op_function_call_simple (func_obj_p, this_arg, arguments_list_p, arguments_list_len);
 
-#if ENABLED (JERRY_ESNEXT)
-  JERRY_CONTEXT (current_new_target) = old_new_target_p;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#if JERRY_ESNEXT
+  JERRY_CONTEXT (current_new_target_p) = old_new_target_p;
+#endif /* JERRY_ESNEXT */
 
   /* 13.a */
   if (ECMA_IS_VALUE_ERROR (ret_value) || ecma_is_value_object (ret_value))
   {
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
     if (new_this_obj_p != NULL)
     {
       ecma_deref_object (new_this_obj_p);
     }
-#else /* !ENABLED (JERRY_ESNEXT) */
+#else /* !JERRY_ESNEXT */
     ecma_deref_object (new_this_obj_p);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
     return ret_value;
   }
 
@@ -1573,12 +1621,31 @@ ecma_op_lazy_instantiate_prototype_object (ecma_object_t *object_p) /**< the fun
   JERRY_ASSERT (ecma_get_object_type (object_p) == ECMA_OBJECT_TYPE_FUNCTION
                 || ecma_get_object_type (object_p) == ECMA_OBJECT_TYPE_NATIVE_FUNCTION);
 
+#if JERRY_BUILTIN_REALMS
+  ecma_global_object_t *global_object_p;
+
+  if (ecma_get_object_type (object_p) == ECMA_OBJECT_TYPE_FUNCTION)
+  {
+    const ecma_compiled_code_t *bytecode_data_p;
+    bytecode_data_p = ecma_op_function_get_compiled_code ((ecma_extended_object_t *) object_p);
+
+    global_object_p = ecma_op_function_get_realm (bytecode_data_p);
+  }
+  else
+  {
+    ecma_native_function_t *native_function_p = (ecma_native_function_t *) object_p;
+
+    global_object_p = ECMA_GET_INTERNAL_VALUE_POINTER (ecma_global_object_t,
+                                                       native_function_p->realm_value);
+  }
+#endif /* JERRY_BUILTIN_REALMS */
+
   /* ECMA-262 v5, 13.2, 16-18 */
 
   ecma_object_t *proto_object_p = NULL;
   bool init_constructor = true;
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   if (ecma_get_object_type (object_p) == ECMA_OBJECT_TYPE_FUNCTION)
   {
     const ecma_compiled_code_t *byte_code_p = ecma_op_function_get_compiled_code ((ecma_extended_object_t *) object_p);
@@ -1590,27 +1657,47 @@ ecma_op_lazy_instantiate_prototype_object (ecma_object_t *object_p) /**< the fun
 
     if (CBC_FUNCTION_GET_TYPE (byte_code_p->status_flags) == CBC_FUNCTION_GENERATOR)
     {
-      proto_object_p = ecma_create_object (ecma_builtin_get (ECMA_BUILTIN_ID_GENERATOR_PROTOTYPE),
-                                           0,
-                                           ECMA_OBJECT_TYPE_GENERAL);
+      ecma_object_t *prototype_p;
+
+#if JERRY_BUILTIN_REALMS
+      prototype_p = ecma_builtin_get_from_realm (global_object_p, ECMA_BUILTIN_ID_GENERATOR_PROTOTYPE);
+#else /* !JERRY_BUILTIN_REALMS */
+      prototype_p = ecma_builtin_get (ECMA_BUILTIN_ID_GENERATOR_PROTOTYPE);
+#endif /* JERRY_BUILTIN_REALMS */
+
+      proto_object_p = ecma_create_object (prototype_p, 0, ECMA_OBJECT_TYPE_GENERAL);
       init_constructor = false;
     }
 
     if (CBC_FUNCTION_GET_TYPE (byte_code_p->status_flags) == CBC_FUNCTION_ASYNC_GENERATOR)
     {
-      proto_object_p = ecma_create_object (ecma_builtin_get (ECMA_BUILTIN_ID_ASYNC_GENERATOR_PROTOTYPE),
-                                           0,
-                                           ECMA_OBJECT_TYPE_GENERAL);
+      ecma_object_t *prototype_p;
+
+#if JERRY_BUILTIN_REALMS
+      prototype_p = ecma_builtin_get_from_realm (global_object_p, ECMA_BUILTIN_ID_ASYNC_GENERATOR_PROTOTYPE);
+#else /* !JERRY_BUILTIN_REALMS */
+      prototype_p = ecma_builtin_get (ECMA_BUILTIN_ID_ASYNC_GENERATOR_PROTOTYPE);
+#endif /* JERRY_BUILTIN_REALMS */
+
+      proto_object_p = ecma_create_object (prototype_p, 0, ECMA_OBJECT_TYPE_GENERAL);
       init_constructor = false;
     }
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   if (proto_object_p == NULL)
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
   {
-    proto_object_p = ecma_op_create_object_object_noarg ();
+    ecma_object_t *prototype_p;
+
+#if JERRY_BUILTIN_REALMS
+    prototype_p = ecma_builtin_get_from_realm (global_object_p, ECMA_BUILTIN_ID_OBJECT_PROTOTYPE);
+#else /* !JERRY_BUILTIN_REALMS */
+    prototype_p = ecma_builtin_get (ECMA_BUILTIN_ID_OBJECT_PROTOTYPE);
+#endif /* JERRY_BUILTIN_REALMS */
+
+    proto_object_p = ecma_op_create_object_object_noarg_and_set_prototype (prototype_p);
   }
 
   /* 17. */
@@ -1657,7 +1744,7 @@ ecma_op_function_try_to_lazy_instantiate_property (ecma_object_t *object_p, /**<
 {
   JERRY_ASSERT (!ecma_get_object_is_builtin (object_p));
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   if (ecma_compare_ecma_string_to_magic_id (property_name_p, LIT_MAGIC_STRING_LENGTH))
   {
     ecma_extended_object_t *ext_func_p = (ecma_extended_object_t *) object_p;
@@ -1709,25 +1796,22 @@ ecma_op_function_try_to_lazy_instantiate_property (ecma_object_t *object_p, /**<
       if (CBC_FUNCTION_GET_TYPE (bytecode_data_p->status_flags) != CBC_FUNCTION_CONSTRUCTOR)
       {
         ecma_value_t value = *ecma_compiled_code_resolve_function_name (bytecode_data_p);
-        if (value != ECMA_VALUE_EMPTY)
-        {
-          JERRY_ASSERT (ecma_is_value_string (value));
+        JERRY_ASSERT (ecma_is_value_string (value));
 
-          /* Initialize 'name' property */
-          ecma_property_t *value_prop_p;
-          ecma_property_value_t *value_p = ecma_create_named_data_property (object_p,
-                                                                            property_name_p,
-                                                                            ECMA_PROPERTY_FLAG_CONFIGURABLE,
-                                                                            &value_prop_p);
-          value_p->value = ecma_copy_value (value);
-          return value_prop_p;
-        }
+        /* Initialize 'name' property */
+        ecma_property_t *value_prop_p;
+        ecma_property_value_t *value_p = ecma_create_named_data_property (object_p,
+                                                                          property_name_p,
+                                                                          ECMA_PROPERTY_FLAG_CONFIGURABLE,
+                                                                          &value_prop_p);
+        value_p->value = ecma_copy_value (value);
+        return value_prop_p;
       }
     }
 
     return NULL;
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   if (ecma_compare_ecma_string_to_magic_id (property_name_p, LIT_MAGIC_STRING_PROTOTYPE)
       && ecma_get_object_type (object_p) == ECMA_OBJECT_TYPE_FUNCTION)
@@ -1743,7 +1827,7 @@ ecma_op_function_try_to_lazy_instantiate_property (ecma_object_t *object_p, /**<
     const ecma_compiled_code_t *bytecode_data_p;
     bytecode_data_p = ecma_op_function_get_compiled_code ((ecma_extended_object_t *) object_p);
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
     if (!(bytecode_data_p->status_flags & CBC_CODE_FLAGS_STRICT_MODE)
         && CBC_FUNCTION_GET_TYPE (bytecode_data_p->status_flags) == CBC_FUNCTION_NORMAL)
     {
@@ -1756,7 +1840,7 @@ ecma_op_function_try_to_lazy_instantiate_property (ecma_object_t *object_p, /**<
       value_p->value = is_arguments ? ECMA_VALUE_NULL : ECMA_VALUE_UNDEFINED;
       return value_prop_p;
     }
-#else /* !ENABLED (JERRY_ESNEXT) */
+#else /* !JERRY_ESNEXT */
     if (bytecode_data_p->status_flags & CBC_CODE_FLAGS_STRICT_MODE)
     {
       ecma_object_t *thrower_p = ecma_builtin_get (ECMA_BUILTIN_ID_TYPE_ERROR_THROWER);
@@ -1771,7 +1855,7 @@ ecma_op_function_try_to_lazy_instantiate_property (ecma_object_t *object_p, /**<
                                            &caller_prop_p);
       return caller_prop_p;
     }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
   }
 
   return NULL;
@@ -1828,7 +1912,7 @@ ecma_op_bound_function_try_to_lazy_instantiate_property (ecma_object_t *object_p
       args_length = ecma_get_integer_from_value (args_len_or_this);
     }
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
     if (ECMA_GET_FIRST_BIT_FROM_POINTER_TAG (bound_func_p->header.u.bound_function.target_function))
     {
       return NULL;
@@ -1839,7 +1923,7 @@ ecma_op_bound_function_try_to_lazy_instantiate_property (ecma_object_t *object_p
 
     /* Set tag bit to represent initialized 'length' property */
     ECMA_SET_FIRST_BIT_TO_POINTER_TAG (bound_func_p->header.u.bound_function.target_function);
-#else /* !ENABLED (JERRY_ESNEXT) */
+#else /* !JERRY_ESNEXT */
     length_attributes = ECMA_PROPERTY_FIXED;
 
     ecma_object_t *target_func_p;
@@ -1856,7 +1940,7 @@ ecma_op_bound_function_try_to_lazy_instantiate_property (ecma_object_t *object_p
 
       length = (ecma_number_t) (ecma_get_integer_from_value (get_len_value) - (args_length - 1));
     }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
     if (length < 0)
     {
@@ -1873,7 +1957,7 @@ ecma_op_bound_function_try_to_lazy_instantiate_property (ecma_object_t *object_p
     return len_prop_p;
   }
 
-#if !ENABLED (JERRY_ESNEXT)
+#if !JERRY_ESNEXT
   if (ecma_compare_ecma_string_to_magic_id (property_name_p, LIT_MAGIC_STRING_CALLER)
       || ecma_compare_ecma_string_to_magic_id (property_name_p, LIT_MAGIC_STRING_ARGUMENTS))
   {
@@ -1889,7 +1973,7 @@ ecma_op_bound_function_try_to_lazy_instantiate_property (ecma_object_t *object_p
                                          &caller_prop_p);
     return caller_prop_p;
   }
-#endif /* !ENABLED (JERRY_ESNEXT) */
+#endif /* !JERRY_ESNEXT */
 
   return NULL;
 } /* ecma_op_bound_function_try_to_lazy_instantiate_property */
@@ -1906,7 +1990,7 @@ ecma_op_function_list_lazy_property_names (ecma_object_t *object_p, /**< functio
                                            ecma_collection_t *prop_names_p, /**< prop name collection */
                                            ecma_property_counter_t *prop_counter_p)  /**< prop counter */
 {
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   ecma_extended_object_t *ext_func_p = (ecma_extended_object_t *) object_p;
   if (!ECMA_GET_FIRST_BIT_FROM_POINTER_TAG (ext_func_p->u.function.scope_cp))
   {
@@ -1914,31 +1998,31 @@ ecma_op_function_list_lazy_property_names (ecma_object_t *object_p, /**< functio
     ecma_collection_push_back (prop_names_p, ecma_make_magic_string_value (LIT_MAGIC_STRING_LENGTH));
     prop_counter_p->string_named_props++;
   }
-#else /* !ENABLED (JERRY_ESNEXT) */
+#else /* !JERRY_ESNEXT */
   /* 'length' property is non-enumerable (ECMA-262 v5, 13.2.5) */
   ecma_collection_push_back (prop_names_p, ecma_make_magic_string_value (LIT_MAGIC_STRING_LENGTH));
   prop_counter_p->string_named_props++;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   const ecma_compiled_code_t *bytecode_data_p;
   bytecode_data_p = ecma_op_function_get_compiled_code ((ecma_extended_object_t *) object_p);
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   if (!CBC_FUNCTION_HAS_PROTOTYPE (bytecode_data_p->status_flags))
   {
     return;
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   /* 'prototype' property is non-enumerable (ECMA-262 v5, 13.2.18) */
   ecma_collection_push_back (prop_names_p, ecma_make_magic_string_value (LIT_MAGIC_STRING_PROTOTYPE));
   prop_counter_p->string_named_props++;
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   bool append_caller_and_arguments = !(bytecode_data_p->status_flags & CBC_CODE_FLAGS_STRICT_MODE);
-#else /* !ENABLED (JERRY_ESNEXT) */
+#else /* !JERRY_ESNEXT */
   bool append_caller_and_arguments = (bytecode_data_p->status_flags & CBC_CODE_FLAGS_STRICT_MODE);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   if (append_caller_and_arguments)
   {
@@ -1964,11 +2048,11 @@ ecma_op_external_function_list_lazy_property_names (ecma_object_t *object_p, /**
                                                     ecma_collection_t *prop_names_p, /**< prop name collection */
                                                     ecma_property_counter_t *prop_counter_p)  /**< prop counter */
 {
-#if !ENABLED (JERRY_ESNEXT)
+#if !JERRY_ESNEXT
   JERRY_UNUSED (object_p);
-#else /* ENABLED (JERRY_ESNEXT) */
+#else /* JERRY_ESNEXT */
   if (!ecma_op_ordinary_object_has_own_property (object_p, ecma_get_magic_string (LIT_MAGIC_STRING_PROTOTYPE)))
-#endif /* !ENABLED (JERRY_ESNEXT) */
+#endif /* !JERRY_ESNEXT */
   {
     /* 'prototype' property is non-enumerable (ECMA-262 v5, 13.2.18) */
     ecma_collection_push_back (prop_names_p, ecma_make_magic_string_value (LIT_MAGIC_STRING_PROTOTYPE));
@@ -1988,7 +2072,7 @@ ecma_op_bound_function_list_lazy_property_names (ecma_object_t *object_p, /**< b
                                                  ecma_collection_t *prop_names_p, /**< prop name collection */
                                                  ecma_property_counter_t *prop_counter_p)  /**< prop counter */
 {
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   /* Unintialized 'length' property is non-enumerable (ECMA-262 v6, 19.2.4.1) */
   ecma_bound_function_t *bound_func_p = (ecma_bound_function_t *) object_p;
   if (!ECMA_GET_FIRST_BIT_FROM_POINTER_TAG (bound_func_p->header.u.bound_function.target_function))
@@ -1996,12 +2080,12 @@ ecma_op_bound_function_list_lazy_property_names (ecma_object_t *object_p, /**< b
     ecma_collection_push_back (prop_names_p, ecma_make_magic_string_value (LIT_MAGIC_STRING_LENGTH));
     prop_counter_p->string_named_props++;
   }
-#else /* !ENABLED (JERRY_ESNEXT) */
+#else /* !JERRY_ESNEXT */
   JERRY_UNUSED (object_p);
   /* 'length' property is non-enumerable (ECMA-262 v5, 13.2.5) */
   ecma_collection_push_back (prop_names_p, ecma_make_magic_string_value (LIT_MAGIC_STRING_LENGTH));
   prop_counter_p->string_named_props++;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   /* 'caller' property is non-enumerable (ECMA-262 v5, 13.2.5) */
   ecma_collection_push_back (prop_names_p, ecma_make_magic_string_value (LIT_MAGIC_STRING_CALLER));

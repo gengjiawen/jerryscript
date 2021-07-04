@@ -23,15 +23,31 @@
 #include "ecma-helpers.h"
 #include "ecma-objects.h"
 #include "ecma-string-object.h"
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 #include "ecma-symbol-object.h"
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 #include "jrt.h"
 
-#if ENABLED (JERRY_BUILTIN_STRING)
+#if JERRY_BUILTIN_STRING
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
+
+/**
+ * This object has a custom dispatch function.
+ */
+#define BUILTIN_CUSTOM_DISPATCH
+
+/**
+ * List of built-in routine identifiers.
+ */
+enum
+{
+  ECMA_BUILTIN_STRING_ROUTINE_START = 0,
+  ECMA_BUILTIN_STRING_OBJECT_FROM_CHAR_CODE,
+  ECMA_BUILTIN_STRING_OBJECT_FROM_CODE_POINT,
+  ECMA_BUILTIN_STRING_OBJECT_RAW,
+};
 
 #define BUILTIN_INC_HEADER_NAME "ecma-builtin-string.inc.h"
 #define BUILTIN_UNDERSCORED_ID string
@@ -57,12 +73,9 @@
  *         Returned value must be freed with ecma_free_value.
  */
 static ecma_value_t
-ecma_builtin_string_object_from_char_code (ecma_value_t this_arg, /**< 'this' argument */
-                                           const ecma_value_t args[], /**< arguments list */
+ecma_builtin_string_object_from_char_code (const ecma_value_t args[], /**< arguments list */
                                            uint32_t args_number) /**< number of arguments */
 {
-  JERRY_UNUSED (this_arg);
-
   if (args_number == 0)
   {
     return ecma_make_magic_string_value (LIT_MAGIC_STRING__EMPTY);
@@ -108,7 +121,7 @@ ecma_builtin_string_object_from_char_code (ecma_value_t this_arg, /**< 'this' ar
   return isError ? ECMA_VALUE_ERROR : ecma_make_string_value (ret_string_p);
 } /* ecma_builtin_string_object_from_char_code */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 /**
  * The String object's 'raw' routine
@@ -120,12 +133,9 @@ ecma_builtin_string_object_from_char_code (ecma_value_t this_arg, /**< 'this' ar
  *         Returned value must be freed with ecma_free_value.
  */
 static ecma_value_t
-ecma_builtin_string_object_raw (ecma_value_t this_arg, /**< 'this' argument */
-                                const ecma_value_t args[], /**< arguments list */
+ecma_builtin_string_object_raw (const ecma_value_t args[], /**< arguments list */
                                 uint32_t args_number) /**< number of arguments */
 {
-  JERRY_UNUSED (this_arg);
-
   /* 1 - 2. */
   const ecma_value_t *substitutions;
   uint32_t number_of_substitutions;
@@ -274,12 +284,9 @@ cleanup:
  *         Returned value must be freed with ecma_free_value.
  */
 static ecma_value_t
-ecma_builtin_string_object_from_code_point (ecma_value_t this_arg, /**< 'this' argument */
-                                            const ecma_value_t args[], /**< arguments list */
+ecma_builtin_string_object_from_code_point (const ecma_value_t args[], /**< arguments list */
                                             uint32_t args_number) /**< number of arguments */
 {
-  JERRY_UNUSED (this_arg);
-
   if (args_number == 0)
   {
     return ecma_make_magic_string_value (LIT_MAGIC_STRING__EMPTY);
@@ -309,7 +316,7 @@ ecma_builtin_string_object_from_code_point (ecma_value_t this_arg, /**< 'this' a
     if (to_number_num < 0 || to_number_num > LIT_UNICODE_CODE_POINT_MAX)
     {
       ecma_stringbuilder_destroy (&builder);
-      return ecma_raise_range_error (ECMA_ERR_MSG ("Error: Invalid code point"));
+      return ecma_raise_range_error (ECMA_ERR_MSG ("Invalid code point"));
     }
 
     lit_code_point_t code_point = (lit_code_point_t) to_number_num;
@@ -328,7 +335,7 @@ ecma_builtin_string_object_from_code_point (ecma_value_t this_arg, /**< 'this' a
   return ecma_make_string_value (ret_str_p);
 } /* ecma_builtin_string_object_from_code_point */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * Handle calling [[Call]] of built-in String object
@@ -351,13 +358,13 @@ ecma_builtin_string_dispatch_call (const ecma_value_t *arguments_list_p, /**< ar
   {
     ret_value = ecma_make_magic_string_value (LIT_MAGIC_STRING__EMPTY);
   }
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   /* 2.a */
   else if (ecma_is_value_symbol (arguments_list_p[0]))
   {
     ret_value = ecma_get_symbol_descriptive_string (arguments_list_p[0]);
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
   /* 2.b */
   else
   {
@@ -388,9 +395,47 @@ ecma_builtin_string_dispatch_construct (const ecma_value_t *arguments_list_p, /*
 } /* ecma_builtin_string_dispatch_construct */
 
 /**
+ * Dispatcher of the built-in's routines
+ *
+ * @return ecma value
+ *         Returned value must be freed with ecma_free_value.
+ */
+ecma_value_t
+ecma_builtin_string_dispatch_routine (uint8_t builtin_routine_id, /**< built-in wide routine identifier */
+                                      ecma_value_t this_arg, /**< 'this' argument value */
+                                      const ecma_value_t arguments_list_p[], /**< list of arguments
+                                                                              *   passed to routine */
+                                      uint32_t arguments_number) /**< length of arguments' list */
+{
+  JERRY_UNUSED (this_arg);
+
+  switch (builtin_routine_id)
+  {
+    case  ECMA_BUILTIN_STRING_OBJECT_FROM_CHAR_CODE:
+    {
+      return ecma_builtin_string_object_from_char_code (arguments_list_p, arguments_number);
+    }
+#if JERRY_ESNEXT
+    case ECMA_BUILTIN_STRING_OBJECT_FROM_CODE_POINT:
+    {
+      return ecma_builtin_string_object_from_code_point (arguments_list_p, arguments_number);
+    }
+    case ECMA_BUILTIN_STRING_OBJECT_RAW:
+    {
+      return ecma_builtin_string_object_raw (arguments_list_p, arguments_number);
+    }
+#endif /* JERRY_ESNEXT */
+    default:
+    {
+      JERRY_UNREACHABLE ();
+    }
+  }
+} /* ecma_builtin_string_dispatch_routine */
+
+/**
  * @}
  * @}
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_STRING) */
+#endif /* JERRY_BUILTIN_STRING */

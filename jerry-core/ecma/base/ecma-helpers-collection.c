@@ -49,7 +49,7 @@ ecma_new_collection (void)
 /**
  * Deallocate a collection of ecma values without freeing it's values
  */
-inline void JERRY_ATTR_ALWAYS_INLINE
+extern inline void JERRY_ATTR_ALWAYS_INLINE
 ecma_collection_destroy (ecma_collection_t *collection_p) /**< value collection */
 {
   JERRY_ASSERT (collection_p != NULL);
@@ -79,7 +79,7 @@ ecma_collection_free_objects (ecma_collection_t *collection_p) /**< value collec
   ecma_collection_destroy (collection_p);
 } /* ecma_collection_free_objects */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 /**
  * Free the template literal objects and deallocate the collection
@@ -96,7 +96,7 @@ ecma_collection_free_template_literal (ecma_collection_t *collection_p) /**< val
     ecma_extended_object_t *array_object_p = (ecma_extended_object_t *) object_p;
 
     JERRY_ASSERT (array_object_p->u.array.length_prop_and_hole_count & ECMA_ARRAY_TEMPLATE_LITERAL);
-    array_object_p->u.array.length_prop_and_hole_count &= (uint32_t) ECMA_ARRAY_TEMPLATE_LITERAL;
+    array_object_p->u.array.length_prop_and_hole_count &= (uint32_t) ~ECMA_ARRAY_TEMPLATE_LITERAL;
 
     ecma_property_value_t *property_value_p;
 
@@ -108,7 +108,7 @@ ecma_collection_free_template_literal (ecma_collection_t *collection_p) /**< val
     array_object_p = (ecma_extended_object_t *) raw_object_p;
 
     JERRY_ASSERT (array_object_p->u.array.length_prop_and_hole_count & ECMA_ARRAY_TEMPLATE_LITERAL);
-    array_object_p->u.array.length_prop_and_hole_count &= (uint32_t) ECMA_ARRAY_TEMPLATE_LITERAL;
+    array_object_p->u.array.length_prop_and_hole_count &= (uint32_t) ~ECMA_ARRAY_TEMPLATE_LITERAL;
 
     ecma_deref_object (raw_object_p);
     ecma_deref_object (object_p);
@@ -117,7 +117,7 @@ ecma_collection_free_template_literal (ecma_collection_t *collection_p) /**< val
   ecma_collection_destroy (collection_p);
 } /* ecma_collection_free_template_literal */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * Free the non-object collection elements and deallocate the collection

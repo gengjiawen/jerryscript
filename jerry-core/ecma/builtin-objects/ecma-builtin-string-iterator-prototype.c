@@ -17,7 +17,7 @@
 #include "ecma-builtins.h"
 #include "ecma-iterator-object.h"
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -54,20 +54,19 @@ ecma_builtin_string_iterator_prototype_object_next (ecma_value_t this_val) /**< 
     /* 1 - 2. */
   if (!ecma_is_value_object (this_val))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not an object."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not an object"));
   }
 
   ecma_object_t *obj_p = ecma_get_object_from_value (this_val);
   ecma_extended_object_t *ext_obj_p = (ecma_extended_object_t *) obj_p;
 
   /* 3. */
-  if (ecma_get_object_type (obj_p) != ECMA_OBJECT_TYPE_PSEUDO_ARRAY
-      || ext_obj_p->u.pseudo_array.type != ECMA_PSEUDO_STRING_ITERATOR)
+  if (!ecma_object_class_is (obj_p, ECMA_OBJECT_CLASS_STRING_ITERATOR))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not an iterator."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not an iterator"));
   }
 
-  ecma_value_t iterated_value = ext_obj_p->u.pseudo_array.u2.iterated_value;
+  ecma_value_t iterated_value = ext_obj_p->u.cls.u3.iterated_value;
 
   /* 4 - 5 */
   if (ecma_is_value_empty (iterated_value))
@@ -80,11 +79,11 @@ ecma_builtin_string_iterator_prototype_object_next (ecma_value_t this_val) /**< 
   ecma_string_t *string_p = ecma_get_string_from_value (iterated_value);
 
   /* 6. */
-  lit_utf8_size_t position = ext_obj_p->u.pseudo_array.u1.iterator_index;
+  lit_utf8_size_t position = ext_obj_p->u.cls.u2.iterator_index;
 
   if (JERRY_UNLIKELY (position == ECMA_ITERATOR_INDEX_LIMIT))
   {
-    return ecma_raise_range_error (ECMA_ERR_MSG ("String iteration cannot be continued."));
+    return ecma_raise_range_error (ECMA_ERR_MSG ("String iteration cannot be continued"));
   }
 
   /* 7. */
@@ -94,7 +93,7 @@ ecma_builtin_string_iterator_prototype_object_next (ecma_value_t this_val) /**< 
   if (position >= len)
   {
     ecma_deref_ecma_string (string_p);
-    ext_obj_p->u.pseudo_array.u2.iterated_value = ECMA_VALUE_EMPTY;
+    ext_obj_p->u.cls.u3.iterated_value = ECMA_VALUE_EMPTY;
     return ecma_create_iter_result_object (ECMA_VALUE_UNDEFINED, ECMA_VALUE_TRUE);
   }
 
@@ -129,7 +128,7 @@ ecma_builtin_string_iterator_prototype_object_next (ecma_value_t this_val) /**< 
   }
 
   /* 13. */
-  ext_obj_p->u.pseudo_array.u1.iterator_index = (uint16_t) (position + result_size);
+  ext_obj_p->u.cls.u2.iterator_index = (uint16_t) (position + result_size);
 
   /* 14. */
   ecma_value_t result = ecma_create_iter_result_object (ecma_make_string_value (result_str_p), ECMA_VALUE_FALSE);
@@ -144,4 +143,4 @@ ecma_builtin_string_iterator_prototype_object_next (ecma_value_t this_val) /**< 
  * @}
  */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */

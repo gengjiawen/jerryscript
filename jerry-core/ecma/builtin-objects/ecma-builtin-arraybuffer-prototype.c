@@ -26,7 +26,7 @@
 #include "jrt.h"
 #include "jrt-libc-includes.h"
 
-#if ENABLED (JERRY_BUILTIN_TYPEDARRAY)
+#if JERRY_BUILTIN_TYPEDARRAY
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -61,11 +61,11 @@ ecma_builtin_arraybuffer_prototype_bytelength_getter (ecma_value_t this_arg) /**
   {
     ecma_object_t *object_p = ecma_get_object_from_value (this_arg);
 
-    if (ecma_object_class_is (object_p, LIT_MAGIC_STRING_ARRAY_BUFFER_UL))
+    if (ecma_object_class_is (object_p, ECMA_OBJECT_CLASS_ARRAY_BUFFER))
     {
       if (ecma_arraybuffer_is_detached (object_p))
       {
-        return ecma_raise_type_error (ECMA_ERR_MSG ("ArrayBuffer has been detached."));
+        return ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_arraybuffer_is_detached));
       }
       uint32_t len = ecma_arraybuffer_get_length (object_p);
 
@@ -73,7 +73,7 @@ ecma_builtin_arraybuffer_prototype_bytelength_getter (ecma_value_t this_arg) /**
     }
   }
 
-  return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a ArrayBuffer object."));
+  return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a ArrayBuffer object"));
 } /* ecma_builtin_arraybuffer_prototype_bytelength_getter */
 
 /**
@@ -92,15 +92,15 @@ ecma_builtin_arraybuffer_prototype_object_slice (ecma_value_t this_arg, /**< thi
 {
   if (!ecma_is_value_object (this_arg))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not object."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not an object"));
   }
 
   ecma_object_t *object_p = ecma_get_object_from_value (this_arg);
 
   /* 2. */
-  if (!ecma_object_class_is (object_p, LIT_MAGIC_STRING_ARRAY_BUFFER_UL))
+  if (!ecma_object_class_is (object_p, ECMA_OBJECT_CLASS_ARRAY_BUFFER))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not an ArrayBuffer object."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not an ArrayBuffer object"));
   }
 
   /* TODO: step 3. if SharedArrayBuffer will be implemented */
@@ -108,7 +108,7 @@ ecma_builtin_arraybuffer_prototype_object_slice (ecma_value_t this_arg, /**< thi
   /* 4. */
   if (ecma_arraybuffer_is_detached (object_p))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("ArrayBuffer has been detached."));
+    return ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_arraybuffer_is_detached));
   }
 
   /* 5. */
@@ -168,9 +168,9 @@ ecma_builtin_arraybuffer_prototype_object_slice (ecma_value_t this_arg, /**< thi
   ecma_value_t ret_value = ECMA_VALUE_EMPTY;
 
   /* 13. */
-  if (!ecma_object_class_is (new_arraybuffer_p, LIT_MAGIC_STRING_ARRAY_BUFFER_UL))
+  if (!ecma_object_class_is (new_arraybuffer_p, ECMA_OBJECT_CLASS_ARRAY_BUFFER))
   {
-    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Return value is not an ArrayBuffer object."));
+    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Return value is not an ArrayBuffer object"));
     goto free_new_arraybuffer;
   }
 
@@ -179,7 +179,7 @@ ecma_builtin_arraybuffer_prototype_object_slice (ecma_value_t this_arg, /**< thi
   /* 15. */
   if (ecma_arraybuffer_is_detached (new_arraybuffer_p))
   {
-    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Return ArrayBuffer has been detached."));
+    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Returned ArrayBuffer has been detached"));
     goto free_new_arraybuffer;
   }
 
@@ -193,14 +193,14 @@ ecma_builtin_arraybuffer_prototype_object_slice (ecma_value_t this_arg, /**< thi
   /* 17. */
   if (ecma_arraybuffer_get_length (new_arraybuffer_p) < new_len)
   {
-    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Derived ArrayBuffer constructor created a too small buffer."));
+    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Derived ArrayBuffer constructor created a too small buffer"));
     goto free_new_arraybuffer;
   }
 
   /* 19. */
   if (ecma_arraybuffer_is_detached (object_p))
   {
-    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Original ArrayBuffer has been detached."));
+    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Original ArrayBuffer has been detached"));
     goto free_new_arraybuffer;
   }
 
@@ -233,4 +233,4 @@ free_new_arraybuffer:
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_TYPEDARRAY) */
+#endif /* JERRY_BUILTIN_TYPEDARRAY */

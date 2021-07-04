@@ -26,16 +26,16 @@
  * @{
  */
 
-#if ENABLED (JERRY_LCACHE)
+#if JERRY_LCACHE
 
 /**
  * Bitshift index for calculating hash.
  */
-#if ENABLED (JERRY_CPOINTER_32_BIT)
+#if JERRY_CPOINTER_32_BIT
 #define ECMA_LCACHE_HASH_BITSHIFT_INDEX (2 * JMEM_ALIGNMENT_LOG)
-#else /* !ENABLED (JERRY_CPOINTER_32_BIT) */
+#else /* !JERRY_CPOINTER_32_BIT */
 #define ECMA_LCACHE_HASH_BITSHIFT_INDEX 0
-#endif /* ENABLED (JERRY_CPOINTER_32_BIT) */
+#endif /* JERRY_CPOINTER_32_BIT */
 
 /**
  * Mask for hash bits
@@ -91,9 +91,7 @@ ecma_lcache_insert (const ecma_object_t *object_p, /**< object */
 {
   JERRY_ASSERT (object_p != NULL);
   JERRY_ASSERT (prop_p != NULL && !ecma_is_property_lcached (prop_p));
-  JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_NAMEDDATA
-                || ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_NAMEDACCESSOR
-                || ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_INTERNAL);
+  JERRY_ASSERT (ECMA_PROPERTY_IS_NAMED_PROPERTY (*prop_p));
 
   jmem_cpointer_t object_cp;
 
@@ -138,7 +136,7 @@ insert:
  * @return a pointer to an ecma_property_t if the lookup is successful
  *         NULL otherwise
  */
-inline ecma_property_t * JERRY_ATTR_ALWAYS_INLINE
+extern inline ecma_property_t * JERRY_ATTR_ALWAYS_INLINE
 ecma_lcache_lookup (const ecma_object_t *object_p, /**< object */
                     const ecma_string_t *prop_name_p) /**< property's name */
 {
@@ -191,9 +189,7 @@ ecma_lcache_invalidate (const ecma_object_t *object_p, /**< object */
 {
   JERRY_ASSERT (object_p != NULL);
   JERRY_ASSERT (prop_p != NULL && ecma_is_property_lcached (prop_p));
-  JERRY_ASSERT (ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_NAMEDDATA
-                || ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_NAMEDACCESSOR
-                || ECMA_PROPERTY_GET_TYPE (*prop_p) == ECMA_PROPERTY_TYPE_INTERNAL);
+  JERRY_ASSERT (ECMA_PROPERTY_IS_NAMED_PROPERTY (*prop_p));
 
   jmem_cpointer_t object_cp;
   ECMA_SET_NON_NULL_POINTER (object_cp, object_p);
@@ -217,7 +213,7 @@ ecma_lcache_invalidate (const ecma_object_t *object_p, /**< object */
   }
 } /* ecma_lcache_invalidate */
 
-#endif /* ENABLED (JERRY_LCACHE) */
+#endif /* JERRY_LCACHE */
 
 /**
  * @}

@@ -45,9 +45,9 @@ enum
   ECMA_FUNCTION_PROTOTYPE_CALL,
   ECMA_FUNCTION_PROTOTYPE_APPLY,
   ECMA_FUNCTION_PROTOTYPE_BIND,
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   ECMA_FUNCTION_PROTOTYPE_SYMBOL_HAS_INSTANCE,
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 };
 
 #define BUILTIN_INC_HEADER_NAME "ecma-builtin-function-prototype.inc.h"
@@ -107,7 +107,7 @@ ecma_builtin_function_prototype_object_apply (ecma_object_t *func_obj_p, /**< th
   /* 3. */
   if (!ecma_is_value_object (arg2))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument is not an object."));
+    return ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_argument_is_not_an_object));
   }
 
   ecma_object_t *obj_p = ecma_get_object_from_value (arg2);
@@ -123,7 +123,7 @@ ecma_builtin_function_prototype_object_apply (ecma_object_t *func_obj_p, /**< th
 
   if (length >= ECMA_FUNCTION_APPLY_ARGUMENT_COUNT_LIMIT)
   {
-    return ecma_raise_range_error (ECMA_ERR_MSG ("Too many arguments declared for Function.apply()."));
+    return ecma_raise_range_error (ECMA_ERR_MSG ("Too many arguments declared for Function.apply"));
   }
 
   /* 6. */
@@ -210,10 +210,10 @@ ecma_builtin_function_prototype_object_bind (ecma_object_t *this_arg_obj_p , /**
   /* 4. 11. 18. */
   ecma_object_t *prototype_obj_p;
 
-#if !ENABLED (JERRY_ESNEXT)
+#if !JERRY_ESNEXT
   prototype_obj_p = ecma_builtin_get (ECMA_BUILTIN_ID_FUNCTION_PROTOTYPE);
-#else /* ENABLED (JERRY_ESNEXT) */
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#else /* JERRY_ESNEXT */
+#if JERRY_BUILTIN_PROXY
   if (ECMA_OBJECT_IS_PROXY (this_arg_obj_p))
   {
     ecma_value_t proto = ecma_proxy_object_get_prototype_of (this_arg_obj_p);
@@ -226,7 +226,7 @@ ecma_builtin_function_prototype_object_bind (ecma_object_t *this_arg_obj_p , /**
   }
   else
   {
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
     jmem_cpointer_t proto_cp = ecma_op_ordinary_object_get_prototype_of (this_arg_obj_p);
     if (proto_cp != JMEM_CP_NULL)
     {
@@ -237,10 +237,10 @@ ecma_builtin_function_prototype_object_bind (ecma_object_t *this_arg_obj_p , /**
     {
       prototype_obj_p = NULL;
     }
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
   }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
-#endif /* !ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_BUILTIN_PROXY */
+#endif /* !JERRY_ESNEXT */
 
   ecma_object_t *function_p;
   ecma_bound_function_t *bound_func_p;
@@ -295,26 +295,27 @@ ecma_builtin_function_prototype_object_bind (ecma_object_t *this_arg_obj_p , /**
     bound_func_p->header.u.bound_function.args_len_or_this = args_len_or_this;
   }
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   if (prototype_obj_p != NULL)
   {
     ecma_deref_object (prototype_obj_p);
   }
 
-  ecma_value_t target_length = ecma_make_integer_value (0);
+  bound_func_p->target_length = ecma_make_integer_value (0);
+
   ecma_string_t *len_string = ecma_get_magic_string (LIT_MAGIC_STRING_LENGTH);
   ecma_property_descriptor_t prop_desc;
   ecma_value_t status = ecma_op_object_get_own_property_descriptor (this_arg_obj_p,
                                                                     len_string,
                                                                     &prop_desc);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
   if (ECMA_IS_VALUE_ERROR (status))
   {
     ecma_deref_object (function_p);
     return status;
   }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
   if (ecma_is_value_true (status))
   {
@@ -332,12 +333,10 @@ ecma_builtin_function_prototype_object_bind (ecma_object_t *this_arg_obj_p , /**
     {
       ecma_number_t len_num;
       ecma_op_to_integer (len_value, &len_num);
-      target_length = ecma_make_number_value (len_num);
+      bound_func_p->target_length = ecma_make_number_value (len_num);
     }
     ecma_free_value (len_value);
   }
-
-  bound_func_p->target_length = target_length;
 
   /* 12. */
   ecma_value_t name_value = ecma_op_object_get_by_magic_id (this_arg_obj_p, LIT_MAGIC_STRING_NAME);
@@ -370,7 +369,7 @@ ecma_builtin_function_prototype_object_bind (ecma_object_t *this_arg_obj_p , /**
                                                        NULL);
 
   name_prop_value_p->value = bound_function_name;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
   /*
    * [[Class]] property is not stored explicitly for objects of ECMA_OBJECT_TYPE_FUNCTION type.
@@ -407,7 +406,7 @@ ecma_builtin_function_prototype_dispatch_construct (const ecma_value_t *argument
 {
   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
 
-  return ecma_raise_type_error (ECMA_ERR_MSG ("'Function.prototype' is not a constructor."));
+  return ecma_raise_type_error (ECMA_ERR_MSG ("Function.prototype is not a constructor"));
 } /* ecma_builtin_function_prototype_dispatch_construct */
 
 /**
@@ -425,14 +424,14 @@ ecma_builtin_function_prototype_dispatch_routine (uint8_t builtin_routine_id, /*
 {
   if (!ecma_op_is_callable (this_arg))
   {
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
     if (JERRY_UNLIKELY (builtin_routine_id == ECMA_FUNCTION_PROTOTYPE_SYMBOL_HAS_INSTANCE))
     {
       return ECMA_VALUE_FALSE;
     }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a function."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a function"));
   }
 
   ecma_object_t *func_obj_p = ecma_get_object_from_value (this_arg);
@@ -457,12 +456,12 @@ ecma_builtin_function_prototype_dispatch_routine (uint8_t builtin_routine_id, /*
     {
       return ecma_builtin_function_prototype_object_bind (func_obj_p, arguments_list_p, arguments_number);
     }
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
     case ECMA_FUNCTION_PROTOTYPE_SYMBOL_HAS_INSTANCE:
     {
       return ecma_op_object_has_instance (func_obj_p, arguments_list_p[0]);
     }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
     default:
     {
       JERRY_UNREACHABLE ();

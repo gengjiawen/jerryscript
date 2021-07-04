@@ -23,7 +23,7 @@
 #include "ecma-function-object.h"
 #include "jrt.h"
 
-#if ENABLED (JERRY_BUILTIN_TYPEDARRAY)
+#if JERRY_BUILTIN_TYPEDARRAY
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -62,7 +62,7 @@ ecma_builtin_typedarray_from (ecma_value_t this_arg, /**< 'this' argument */
 
   if (!ecma_is_constructor (this_arg))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("'this' is not a constructor."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a constructor"));
   }
 
   ecma_value_t source;
@@ -71,7 +71,7 @@ ecma_builtin_typedarray_from (ecma_value_t this_arg, /**< 'this' argument */
 
   if (arguments_list_len == 0)
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("no source argument"));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("No source argument"));
   }
 
   source = arguments_list_p[0];
@@ -82,7 +82,7 @@ ecma_builtin_typedarray_from (ecma_value_t this_arg, /**< 'this' argument */
 
     if (!ecma_op_is_callable (map_fn))
     {
-      return ecma_raise_type_error (ECMA_ERR_MSG ("mapfn argument is not callable"));
+      return ecma_raise_type_error (ECMA_ERR_MSG ("The 'mapfn' argument is not callable"));
     }
 
     if (arguments_list_len > 2)
@@ -91,25 +91,10 @@ ecma_builtin_typedarray_from (ecma_value_t this_arg, /**< 'this' argument */
     }
   }
 
-  ecma_object_t *obj_p = ecma_get_object_from_value (this_arg);
-
-  const uint8_t builtin_id = ecma_get_object_builtin_id (obj_p);
-  if (!ecma_typedarray_helper_is_typedarray (builtin_id))
-  {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("'this' is not a typedarray constructor"));
-  }
-
-  ecma_typedarray_type_t typedarray_id = ecma_typedarray_helper_builtin_to_typedarray_id (builtin_id);
-
-  ecma_object_t *proto_p = ecma_builtin_get (ecma_typedarray_helper_get_prototype_id (typedarray_id));
-  const uint8_t element_size_shift = ecma_typedarray_helper_get_shift_size (typedarray_id);
-
-  return ecma_op_typedarray_from (source,
+  return ecma_op_typedarray_from (this_arg,
+                                  source,
                                   map_fn,
-                                  this_in_fn,
-                                  proto_p,
-                                  element_size_shift,
-                                  typedarray_id);
+                                  this_in_fn);
 
 } /* ecma_builtin_typedarray_from */
 
@@ -129,27 +114,13 @@ ecma_builtin_typedarray_of (ecma_value_t this_arg, /**< 'this' argument */
 {
   if (!ecma_is_constructor (this_arg))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("'this' is not a constructor."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a constructor"));
   }
 
-  ecma_object_t *obj_p = ecma_get_object_from_value (this_arg);
-  const uint8_t builtin_id = ecma_get_object_builtin_id (obj_p);
-
-  if (!ecma_typedarray_helper_is_typedarray (builtin_id))
-  {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("'this' is not a typedarray constructor"));
-  }
-
-  ecma_typedarray_type_t typedarray_id = ecma_typedarray_helper_builtin_to_typedarray_id (builtin_id);
-
-  ecma_object_t *proto_p = ecma_builtin_get (ecma_typedarray_helper_get_prototype_id (typedarray_id));
-  const uint8_t element_size_shift = ecma_typedarray_helper_get_shift_size (typedarray_id);
-
-  ecma_value_t ret_val = ecma_typedarray_create_object_with_length (arguments_list_len,
-                                                                    NULL,
-                                                                    proto_p,
-                                                                    element_size_shift,
-                                                                    typedarray_id);
+  ecma_object_t *constructor_obj_p = ecma_get_object_from_value (this_arg);
+  ecma_value_t len_val = ecma_make_uint32_value (arguments_list_len);
+  ecma_value_t ret_val = ecma_typedarray_create (constructor_obj_p, &len_val, 1);
+  ecma_free_value (len_val);
 
   if (ECMA_IS_VALUE_ERROR (ret_val))
   {
@@ -230,4 +201,4 @@ ecma_builtin_typedarray_species_get (ecma_value_t this_value) /**< This Value */
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_TYPEDARRAY) */
+#endif /* JERRY_BUILTIN_TYPEDARRAY */

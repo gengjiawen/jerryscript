@@ -26,7 +26,7 @@
  #include "jcontext.h"
  #include "jrt.h"
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -75,7 +75,7 @@ ecma_builtin_symbol_dispatch_construct (const ecma_value_t *arguments_list_p, /*
 {
   JERRY_ASSERT (arguments_list_len == 0 || arguments_list_p != NULL);
 
-  return ecma_raise_type_error (ECMA_ERR_MSG ("Symbol is not a constructor."));
+  return ecma_raise_type_error (ECMA_ERR_MSG ("Symbol is not a constructor"));
 } /* ecma_builtin_symbol_dispatch_construct */
 
 /**
@@ -242,7 +242,7 @@ ecma_builtin_symbol_key_for (ecma_value_t this_arg, /**< this argument */
   /* 1. */
   if (!ecma_is_value_symbol (symbol))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("The given argument is not a Symbol."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("The given argument is not a Symbol"));
   }
 
   /* 2-4. */
@@ -255,4 +255,4 @@ ecma_builtin_symbol_key_for (ecma_value_t this_arg, /**< this argument */
  * @}
  */
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */

@@ -45,7 +45,7 @@ vm_is_strict_mode (void)
  *                without 'this' argument,
  *         false - otherwise
  */
-inline bool JERRY_ATTR_ALWAYS_INLINE
+extern inline bool JERRY_ATTR_ALWAYS_INLINE
 vm_is_direct_eval_form_call (void)
 {
   return (JERRY_CONTEXT (status_flags) & ECMA_STATUS_DIRECT_EVAL) != 0;
@@ -61,13 +61,14 @@ vm_is_direct_eval_form_call (void)
 ecma_value_t
 vm_get_backtrace (uint32_t max_depth) /**< maximum backtrace depth, 0 = unlimited */
 {
-#if ENABLED (JERRY_LINE_INFO)
+#if JERRY_LINE_INFO
+  vm_frame_ctx_t *context_p = JERRY_CONTEXT (vm_top_context_p);
+
   if (max_depth == 0)
   {
     max_depth = UINT32_MAX;
   }
 
-  vm_frame_ctx_t *context_p = JERRY_CONTEXT (vm_top_context_p);
   ecma_object_t *array_p = ecma_op_new_array_object (0);
   JERRY_ASSERT (ecma_op_object_is_fast_array (array_p));
   uint32_t index = 0;
@@ -106,9 +107,9 @@ vm_get_backtrace (uint32_t max_depth) /**< maximum backtrace depth, 0 = unlimite
   }
 
   return ecma_make_object_value (array_p);
-#else /* !ENABLED (JERRY_LINE_INFO) */
+#else /* !JERRY_LINE_INFO */
   JERRY_UNUSED (max_depth);
 
   return ecma_make_object_value (ecma_op_new_array_object (0));
-#endif /* ENABLED (JERRY_LINE_INFO) */
+#endif /* JERRY_LINE_INFO */
 } /* vm_get_backtrace */

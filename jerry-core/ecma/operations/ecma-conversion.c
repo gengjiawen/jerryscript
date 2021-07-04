@@ -59,7 +59,7 @@ ecma_op_require_object_coercible (ecma_value_t value) /**< ecma value */
 
   if (ecma_is_value_undefined (value) || ecma_is_value_null (value))
   {
-    ecma_raise_type_error (ECMA_ERR_MSG ("Argument cannot be converted to an object."));
+    ecma_raise_type_error (ECMA_ERR_MSG ("Argument cannot be converted to an object"));
     return false;
   }
 
@@ -123,19 +123,19 @@ ecma_op_same_value (ecma_value_t x, /**< ecma value */
     return ecma_compare_ecma_strings (x_str_p, y_str_p);
   }
 
-#if ENABLED (JERRY_BUILTIN_BIGINT)
+#if JERRY_BUILTIN_BIGINT
   if (ecma_is_value_bigint (x))
   {
     return (ecma_is_value_bigint (y) && ecma_bigint_compare_to_bigint (x, y) == 0);
   }
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
+#endif /* JERRY_BUILTIN_BIGINT */
 
   JERRY_ASSERT (ecma_is_value_object (x) || ecma_is_value_symbol (x));
 
   return false;
 } /* ecma_op_same_value */
 
-#if ENABLED (JERRY_BUILTIN_MAP)
+#if JERRY_BUILTIN_MAP
 /**
  * SameValueZero operation.
  *
@@ -182,7 +182,7 @@ ecma_op_same_value_zero (ecma_value_t x, /**< ecma value */
 
   return ecma_op_same_value (x, y);
 } /* ecma_op_same_value_zero */
-#endif /* ENABLED (JERRY_BUILTIN_MAP) */
+#endif /* JERRY_BUILTIN_MAP */
 
 /**
  * ToPrimitive operation.
@@ -253,12 +253,12 @@ ecma_op_to_boolean (ecma_value_t value) /**< ecma value */
     return !ecma_string_is_empty (str_p);
   }
 
-#if ENABLED (JERRY_BUILTIN_BIGINT)
+#if JERRY_BUILTIN_BIGINT
   if (ecma_is_value_bigint (value))
   {
     return value != ECMA_BIGINT_ZERO;
   }
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
+#endif /* JERRY_BUILTIN_BIGINT */
 
   JERRY_ASSERT (ecma_is_value_object (value) || ecma_is_value_symbol (value));
 
@@ -274,7 +274,7 @@ ecma_op_to_boolean (ecma_value_t value) /**< ecma value */
  * @return ecma value
  *         Returned value must be freed with ecma_free_value
  */
-inline ecma_value_t JERRY_ATTR_ALWAYS_INLINE
+extern inline ecma_value_t JERRY_ATTR_ALWAYS_INLINE
 ecma_op_to_number (ecma_value_t value, /**< ecma value */
                    ecma_number_t *number_p) /**< [out] ecma number */
 {
@@ -341,14 +341,14 @@ ecma_op_to_numeric (ecma_value_t value, /**< ecma value */
     return ECMA_VALUE_EMPTY;
   }
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   if (ecma_is_value_symbol (value))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Cannot convert a Symbol value to a number."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Cannot convert a Symbol value to a number"));
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
-#if ENABLED (JERRY_BUILTIN_BIGINT)
+#if JERRY_BUILTIN_BIGINT
   if (ecma_is_value_bigint (value))
   {
     if (options & ECMA_TO_NUMERIC_ALLOW_BIGINT)
@@ -357,7 +357,7 @@ ecma_op_to_numeric (ecma_value_t value, /**< ecma value */
     }
     return ecma_raise_type_error (ECMA_ERR_MSG ("Cannot convert a BigInt value to a number"));
   }
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
+#endif /* JERRY_BUILTIN_BIGINT */
 
   JERRY_ASSERT (ecma_is_value_object (value));
 
@@ -438,20 +438,20 @@ ecma_op_to_string (ecma_value_t value) /**< ecma value */
     return ecma_get_magic_string (LIT_MAGIC_STRING_FALSE);
   }
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   if (ecma_is_value_symbol (value))
   {
-    ecma_raise_type_error (ECMA_ERR_MSG ("Cannot convert a Symbol value to a string."));
+    ecma_raise_type_error (ECMA_ERR_MSG ("Cannot convert a Symbol value to a string"));
     return NULL;
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
-#if ENABLED (JERRY_BUILTIN_BIGINT)
+#if JERRY_BUILTIN_BIGINT
   if (ecma_is_value_bigint (value))
   {
     return ecma_bigint_to_string (value, 10);
   }
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
+#endif /* JERRY_BUILTIN_BIGINT */
 
   JERRY_ASSERT (ecma_is_value_object (value));
 
@@ -493,7 +493,7 @@ ecma_op_to_property_key (ecma_value_t value) /**< ecma value */
     return key_p;
   }
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   ecma_value_t key = ecma_op_to_primitive (value, ECMA_PREFERRED_TYPE_STRING);
 
   if (ECMA_IS_VALUE_ERROR (key))
@@ -511,11 +511,11 @@ ecma_op_to_property_key (ecma_value_t value) /**< ecma value */
   ecma_free_value (key);
 
   return result;
-#else /* !ENABLED (JERRY_ESNEXT) */
+#else /* !JERRY_ESNEXT */
   ecma_check_value_type_is_spec_defined (value);
 
   return ecma_op_to_string (value);
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 } /* ecma_op_to_property_key */
 
 /**
@@ -531,45 +531,66 @@ ecma_value_t
 ecma_op_to_object (ecma_value_t value) /**< ecma value */
 {
   ecma_check_value_type_is_spec_defined (value);
+  ecma_builtin_id_t proto_id = ECMA_BUILTIN_ID_OBJECT_PROTOTYPE;
+  uint8_t class_type;
 
   if (ecma_is_value_number (value))
   {
-    return ecma_op_create_number_object (value);
+#if JERRY_BUILTIN_NUMBER
+    proto_id =  ECMA_BUILTIN_ID_NUMBER_PROTOTYPE;
+#endif /* JERRY_BUILTIN_NUMBER */
+    class_type = ECMA_OBJECT_CLASS_NUMBER;
   }
   else if (ecma_is_value_string (value))
   {
-    return ecma_op_create_string_object (&value, 1);
+#if JERRY_BUILTIN_STRING
+    proto_id = ECMA_BUILTIN_ID_STRING_PROTOTYPE;
+#endif /* JERRY_BUILTIN_STRING */
+    class_type = ECMA_OBJECT_CLASS_STRING;
   }
   else if (ecma_is_value_object (value))
   {
     return ecma_copy_value (value);
   }
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   else if (ecma_is_value_symbol (value))
   {
-    return ecma_op_create_symbol_object (value);
+    proto_id = ECMA_BUILTIN_ID_SYMBOL_PROTOTYPE;
+    class_type = ECMA_OBJECT_CLASS_SYMBOL;
   }
-#endif /* ENABLED (JERRY_ESNEXT) */
-#if ENABLED (JERRY_BUILTIN_BIGINT)
+#endif /* JERRY_ESNEXT */
+#if JERRY_BUILTIN_BIGINT
   else if (ecma_is_value_bigint (value))
   {
     return ecma_op_create_bigint_object (value);
   }
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
+#endif /* JERRY_BUILTIN_BIGINT */
   else
   {
     if (ecma_is_value_undefined (value)
         || ecma_is_value_null (value))
     {
-      return ecma_raise_type_error (ECMA_ERR_MSG ("Argument cannot be converted to an object."));
+      return ecma_raise_type_error (ECMA_ERR_MSG ("Argument cannot be converted to an object"));
     }
     else
     {
       JERRY_ASSERT (ecma_is_value_boolean (value));
-
-      return ecma_op_create_boolean_object (value);
+#if JERRY_BUILTIN_BOOLEAN
+      proto_id = ECMA_BUILTIN_ID_BOOLEAN_PROTOTYPE;
+#endif /* JERRY_BUILTIN_BOOLEAN */
+      class_type = ECMA_OBJECT_CLASS_BOOLEAN;
     }
   }
+
+  ecma_object_t *object_p = ecma_create_object (ecma_builtin_get (proto_id),
+                                                sizeof (ecma_extended_object_t),
+                                                ECMA_OBJECT_TYPE_CLASS);
+
+  ecma_extended_object_t *ext_object_p = (ecma_extended_object_t *) object_p;
+  ext_object_p->u.cls.type = class_type;
+  ext_object_p->u.cls.u3.value = ecma_copy_value_if_not_object (value);
+
+  return ecma_make_object_value (object_p);
 } /* ecma_op_to_object */
 
 /**
@@ -589,20 +610,20 @@ ecma_op_from_property_descriptor (const ecma_property_descriptor_t *src_prop_des
   ecma_value_t completion;
   ecma_property_descriptor_t prop_desc = ecma_make_empty_property_descriptor ();
   {
-    prop_desc.flags = (ECMA_PROP_IS_VALUE_DEFINED
-                       | ECMA_PROP_IS_WRITABLE_DEFINED
-                       | ECMA_PROP_IS_WRITABLE
-                       | ECMA_PROP_IS_ENUMERABLE_DEFINED
-                       | ECMA_PROP_IS_ENUMERABLE
-                       | ECMA_PROP_IS_CONFIGURABLE_DEFINED
-                       | ECMA_PROP_IS_CONFIGURABLE);
+    prop_desc.flags = (JERRY_PROP_IS_VALUE_DEFINED
+                       | JERRY_PROP_IS_WRITABLE_DEFINED
+                       | JERRY_PROP_IS_WRITABLE
+                       | JERRY_PROP_IS_ENUMERABLE_DEFINED
+                       | JERRY_PROP_IS_ENUMERABLE
+                       | JERRY_PROP_IS_CONFIGURABLE_DEFINED
+                       | JERRY_PROP_IS_CONFIGURABLE);
   }
 
   /* 3. */
-  if (src_prop_desc_p->flags & (ECMA_PROP_IS_VALUE_DEFINED | ECMA_PROP_IS_WRITABLE_DEFINED))
+  if (src_prop_desc_p->flags & (JERRY_PROP_IS_VALUE_DEFINED | JERRY_PROP_IS_WRITABLE_DEFINED))
   {
-    JERRY_ASSERT ((prop_desc.flags & (ECMA_PROP_IS_VALUE_DEFINED | ECMA_PROP_IS_WRITABLE_DEFINED))
-                   == (ECMA_PROP_IS_VALUE_DEFINED | ECMA_PROP_IS_WRITABLE_DEFINED));
+    JERRY_ASSERT ((prop_desc.flags & (JERRY_PROP_IS_VALUE_DEFINED | JERRY_PROP_IS_WRITABLE_DEFINED))
+                   == (JERRY_PROP_IS_VALUE_DEFINED | JERRY_PROP_IS_WRITABLE_DEFINED));
 
     /* a. */
     prop_desc.value = src_prop_desc_p->value;
@@ -613,7 +634,7 @@ ecma_op_from_property_descriptor (const ecma_property_descriptor_t *src_prop_des
     JERRY_ASSERT (ecma_is_value_true (completion));
 
     /* b. */
-    prop_desc.value = ecma_make_boolean_value (src_prop_desc_p->flags & ECMA_PROP_IS_WRITABLE);
+    prop_desc.value = ecma_make_boolean_value (src_prop_desc_p->flags & JERRY_PROP_IS_WRITABLE);
 
     completion = ecma_op_object_define_own_property (obj_p,
                                                      ecma_get_magic_string (LIT_MAGIC_STRING_WRITABLE),
@@ -622,11 +643,11 @@ ecma_op_from_property_descriptor (const ecma_property_descriptor_t *src_prop_des
   }
   else
   {
-#if !ENABLED (JERRY_ESNEXT)
-    JERRY_ASSERT (src_prop_desc_p->flags & (ECMA_PROP_IS_GET_DEFINED | ECMA_PROP_IS_SET_DEFINED));
-#else /* ENABLED (JERRY_ESNEXT) */
-    if (src_prop_desc_p->flags & (ECMA_PROP_IS_GET_DEFINED | ECMA_PROP_IS_SET_DEFINED))
-#endif /* ENABLED (JERRY_ESNEXT) */
+#if !JERRY_ESNEXT
+    JERRY_ASSERT (src_prop_desc_p->flags & (JERRY_PROP_IS_GET_DEFINED | JERRY_PROP_IS_SET_DEFINED));
+#else /* JERRY_ESNEXT */
+    if (src_prop_desc_p->flags & (JERRY_PROP_IS_GET_DEFINED | JERRY_PROP_IS_SET_DEFINED))
+#endif /* JERRY_ESNEXT */
     {
       /* a. */
       if (src_prop_desc_p->get_p == NULL)
@@ -660,14 +681,14 @@ ecma_op_from_property_descriptor (const ecma_property_descriptor_t *src_prop_des
     }
   }
 
-  prop_desc.value = ecma_make_boolean_value (src_prop_desc_p->flags & ECMA_PROP_IS_ENUMERABLE);
+  prop_desc.value = ecma_make_boolean_value (src_prop_desc_p->flags & JERRY_PROP_IS_ENUMERABLE);
 
   completion = ecma_op_object_define_own_property (obj_p,
                                                    ecma_get_magic_string (LIT_MAGIC_STRING_ENUMERABLE),
                                                    &prop_desc);
   JERRY_ASSERT (ecma_is_value_true (completion));
 
-  prop_desc.value = ecma_make_boolean_value (src_prop_desc_p->flags & ECMA_PROP_IS_CONFIGURABLE);
+  prop_desc.value = ecma_make_boolean_value (src_prop_desc_p->flags & JERRY_PROP_IS_CONFIGURABLE);
 
   completion = ecma_op_object_define_own_property (obj_p,
                                                    ecma_get_magic_string (LIT_MAGIC_STRING_CONFIGURABLE),
@@ -683,19 +704,18 @@ ecma_op_from_property_descriptor (const ecma_property_descriptor_t *src_prop_des
  * See also:
  *          ECMA-262 v5, 8.10.5
  *
- * @return ecma value
- *         Returned value must be freed with ecma_free_value
+ * @return ECMA_VALUE_EMPTY if successful, ECMA_VALUE_ERROR otherwise
  */
 ecma_value_t
 ecma_op_to_property_descriptor (ecma_value_t obj_value, /**< object value */
                                 ecma_property_descriptor_t *out_prop_desc_p) /**< [out] filled property descriptor
-                                                                                  if return value is normal
-                                                                                  empty completion value */
+                                                                              *   if the operation is successful,
+                                                                              *   unmodified otherwise */
 {
   /* 1. */
   if (!ecma_is_value_object (obj_value))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Expected an object."));
+    return ecma_raise_type_error (ECMA_ERR_MSG ("Expected an object"));
   }
 
   ecma_object_t *obj_p = ecma_get_object_from_value (obj_value);
@@ -715,10 +735,10 @@ ecma_op_to_property_descriptor (ecma_value_t obj_value, /**< object value */
 
   if (ecma_is_value_found (enumerable_prop_value))
   {
-    uint32_t is_enumerable = (ecma_op_to_boolean (enumerable_prop_value) ? ECMA_PROP_IS_ENUMERABLE
-                                                                         : ECMA_PROP_NO_OPTS);
+    uint32_t is_enumerable = (ecma_op_to_boolean (enumerable_prop_value) ? JERRY_PROP_IS_ENUMERABLE
+                                                                         : JERRY_PROP_NO_OPTS);
 
-    prop_desc.flags |= (uint16_t) (ECMA_PROP_IS_ENUMERABLE_DEFINED | is_enumerable);
+    prop_desc.flags |= (uint16_t) (JERRY_PROP_IS_ENUMERABLE_DEFINED | is_enumerable);
 
     ecma_free_value (enumerable_prop_value);
   }
@@ -734,10 +754,10 @@ ecma_op_to_property_descriptor (ecma_value_t obj_value, /**< object value */
 
   if (ecma_is_value_found (configurable_prop_value))
   {
-    uint32_t is_configurable = (ecma_op_to_boolean (configurable_prop_value) ? ECMA_PROP_IS_CONFIGURABLE
-                                                                             : ECMA_PROP_NO_OPTS);
+    uint32_t is_configurable = (ecma_op_to_boolean (configurable_prop_value) ? JERRY_PROP_IS_CONFIGURABLE
+                                                                             : JERRY_PROP_NO_OPTS);
 
-    prop_desc.flags |= (uint16_t) (ECMA_PROP_IS_CONFIGURABLE_DEFINED | is_configurable);
+    prop_desc.flags |= (uint16_t) (JERRY_PROP_IS_CONFIGURABLE_DEFINED | is_configurable);
 
     ecma_free_value (configurable_prop_value);
   }
@@ -753,7 +773,7 @@ ecma_op_to_property_descriptor (ecma_value_t obj_value, /**< object value */
 
   if (ecma_is_value_found (value_prop_value))
   {
-    prop_desc.flags |= ECMA_PROP_IS_VALUE_DEFINED;
+    prop_desc.flags |= JERRY_PROP_IS_VALUE_DEFINED;
     prop_desc.value = ecma_copy_value (value_prop_value);
     ecma_free_value (value_prop_value);
   }
@@ -769,10 +789,10 @@ ecma_op_to_property_descriptor (ecma_value_t obj_value, /**< object value */
 
   if (ecma_is_value_found (writable_prop_value))
   {
-    uint32_t is_writable = (ecma_op_to_boolean (writable_prop_value) ? ECMA_PROP_IS_WRITABLE
-                                                                     : ECMA_PROP_NO_OPTS);
+    uint32_t is_writable = (ecma_op_to_boolean (writable_prop_value) ? JERRY_PROP_IS_WRITABLE
+                                                                     : JERRY_PROP_NO_OPTS);
 
-    prop_desc.flags |= (uint16_t) (ECMA_PROP_IS_WRITABLE_DEFINED | is_writable);
+    prop_desc.flags |= (uint16_t) (JERRY_PROP_IS_WRITABLE_DEFINED | is_writable);
 
     ecma_free_value (writable_prop_value);
   }
@@ -792,11 +812,11 @@ ecma_op_to_property_descriptor (ecma_value_t obj_value, /**< object value */
         && !ecma_is_value_undefined (get_prop_value))
     {
       ecma_free_value (get_prop_value);
-      ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Expected a function."));
+      ret_value = ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_expected_a_function));
       goto free_desc;
     }
 
-    prop_desc.flags |= ECMA_PROP_IS_GET_DEFINED;
+    prop_desc.flags |= JERRY_PROP_IS_GET_DEFINED;
 
     if (ecma_is_value_undefined (get_prop_value))
     {
@@ -830,11 +850,11 @@ ecma_op_to_property_descriptor (ecma_value_t obj_value, /**< object value */
         && !ecma_is_value_undefined (set_prop_value))
     {
       ecma_free_value (set_prop_value);
-      ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Expected a function."));
+      ret_value = ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_expected_a_function));
       goto free_desc;
     }
 
-    prop_desc.flags |= ECMA_PROP_IS_SET_DEFINED;
+    prop_desc.flags |= JERRY_PROP_IS_SET_DEFINED;
 
     if (ecma_is_value_undefined (set_prop_value))
     {
@@ -854,10 +874,10 @@ ecma_op_to_property_descriptor (ecma_value_t obj_value, /**< object value */
   }
 
   /* 9. */
-  if ((prop_desc.flags & (ECMA_PROP_IS_VALUE_DEFINED | ECMA_PROP_IS_WRITABLE_DEFINED))
-        && (prop_desc.flags & (ECMA_PROP_IS_GET_DEFINED | ECMA_PROP_IS_SET_DEFINED)))
+  if ((prop_desc.flags & (JERRY_PROP_IS_VALUE_DEFINED | JERRY_PROP_IS_WRITABLE_DEFINED))
+        && (prop_desc.flags & (JERRY_PROP_IS_GET_DEFINED | JERRY_PROP_IS_SET_DEFINED)))
   {
-    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Accessors cannot be writable."));
+    ret_value = ecma_raise_type_error (ECMA_ERR_MSG ("Accessors cannot be writable"));
   }
   else
   {
@@ -966,7 +986,7 @@ ecma_op_to_length (ecma_value_t value, /**< ecma value */
     return value;
   }
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   /* 2 */
   ecma_number_t num;
   ecma_value_t length_num = ecma_op_to_integer (value, &num);
@@ -994,7 +1014,7 @@ ecma_op_to_length (ecma_value_t value, /**< ecma value */
   /* 6 */
   *length = (ecma_length_t) num;
   return ECMA_VALUE_EMPTY;
-#else /* !ENABLED (JERRY_ESNEXT) */
+#else /* !JERRY_ESNEXT */
   /* In the case of ES5, ToLength(ES6) operation is the same as ToUint32(ES5) */
   ecma_number_t num;
   ecma_value_t to_number = ecma_op_to_number (value, &num);
@@ -1007,10 +1027,10 @@ ecma_op_to_length (ecma_value_t value, /**< ecma value */
 
   *length = ecma_number_to_uint32 (num);
   return ECMA_VALUE_EMPTY;
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 } /* ecma_op_to_length */
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 /**
  * ToIndex operation.
  *
@@ -1072,7 +1092,7 @@ ecma_op_create_list_from_array_like (ecma_value_t arr,  /**< array value */
   /* 3. */
   if (!ecma_is_value_object (arr))
   {
-    ecma_raise_type_error (ECMA_ERR_MSG ("Argument is not an Object."));
+    ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_argument_is_not_an_object));
     return NULL;
   }
   ecma_object_t *obj_p = ecma_get_object_from_value (arr);
@@ -1102,7 +1122,7 @@ ecma_op_create_list_from_array_like (ecma_value_t arr,  /**< array value */
     {
       ecma_free_value (next);
       ecma_collection_free (list_ptr);
-      ecma_raise_type_error (ECMA_ERR_MSG ("Property name is neither Symbol nor String."));
+      ecma_raise_type_error (ECMA_ERR_MSG ("Property name is neither Symbol nor string"));
       return NULL;
     }
 
@@ -1112,7 +1132,7 @@ ecma_op_create_list_from_array_like (ecma_value_t arr,  /**< array value */
   /* 9. */
   return list_ptr;
 } /* ecma_op_create_list_from_array_like */
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * @}

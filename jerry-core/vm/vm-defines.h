@@ -44,11 +44,11 @@ typedef enum
   VM_FRAME_CTX_SHARED_DIRECT_EVAL = (1 << 1),         /**< direct eval call */
   VM_FRAME_CTX_SHARED_FREE_THIS = (1 << 2),           /**< free this binding */
   VM_FRAME_CTX_SHARED_FREE_LOCAL_ENV = (1 << 3),      /**< free local environment */
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
   VM_FRAME_CTX_SHARED_NON_ARROW_FUNC = (1 << 4),      /**< non-arrow function */
   VM_FRAME_CTX_SHARED_HERITAGE_PRESENT = (1 << 5),    /**< class heritage present */
   VM_FRAME_CTX_SHARED_HAS_CLASS_FIELDS = (1 << 6),    /**< has class fields */
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 } vm_frame_ctx_shared_flags_t;
 
 /**
@@ -57,6 +57,7 @@ typedef enum
 typedef struct
 {
   const ecma_compiled_code_t *bytecode_header_p;      /**< currently executed byte-code data */
+  ecma_object_t *function_object_p;                   /**< function obj */
   uint32_t status_flags;                              /**< combination of vm_frame_ctx_shared_flags_t bits */
 } vm_frame_ctx_shared_t;
 
@@ -66,15 +67,11 @@ typedef struct
 typedef struct
 {
   vm_frame_ctx_shared_t header;                       /**< shared data header */
-  ecma_object_t *function_object_p;                   /**< function obj */
   const ecma_value_t *arg_list_p;                     /**< arguments list */
   uint32_t arg_list_len;                              /**< arguments list length */
 } vm_frame_ctx_shared_args_t;
 
-#if ENABLED (JERRY_ESNEXT)
-
-#define VM_FRAME_CTX_GET_FUNCTION_OBJECT(frame_ctx_p) \
-  (((vm_frame_ctx_shared_args_t *) (frame_ctx_p)->shared_p)->function_object_p)
+#if JERRY_ESNEXT
 
 /**
  * Shared data extended with computed class fields
@@ -91,7 +88,7 @@ typedef struct
 #define VM_GET_COMPUTED_CLASS_FIELDS(frame_ctx_p) \
   (((vm_frame_ctx_shared_class_fields_t *) ((frame_ctx_p)->shared_p))->computed_class_fields_p)
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * Flag bits of vm_frame_ctx_t
@@ -116,9 +113,9 @@ typedef struct vm_frame_ctx_t
   struct vm_frame_ctx_t *prev_context_p;              /**< previous context */
   ecma_value_t this_binding;                          /**< this binding */
   ecma_value_t block_result;                          /**< block result */
-#if ENABLED (JERRY_LINE_INFO)
+#if JERRY_LINE_INFO
   uint32_t current_line;                              /**< currently executed line */
-#endif /* ENABLED (JERRY_LINE_INFO) */
+#endif /* JERRY_LINE_INFO */
   uint16_t context_depth;                             /**< current context depth */
   uint8_t status_flags;                               /**< combination of vm_frame_ctx_flags_t bits */
   uint8_t call_operation;                             /**< perform a call or construct operation */
@@ -150,6 +147,18 @@ typedef struct
   vm_frame_ctx_shared_t shared; /**< shared part */
   vm_frame_ctx_t frame_ctx; /**< frame context part */
 } vm_executable_object_t;
+
+/**
+ * Real backtrace frame data passed to the jerry_backtrace_callback_t handler.
+ */
+struct jerry_backtrace_frame_internal_t
+{
+  vm_frame_ctx_t *context_p; /**< context pointer */
+  uint8_t frame_type; /**< frame type */
+  jerry_backtrace_location_t location; /**< location information */
+  ecma_value_t function; /**< function reference */
+  ecma_value_t this_binding; /**< this binding passed to the function */
+};
 
 /**
  * @}

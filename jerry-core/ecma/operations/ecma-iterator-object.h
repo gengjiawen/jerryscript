@@ -18,7 +18,7 @@
 
 #include "ecma-globals.h"
 
-#if ENABLED (JERRY_ESNEXT)
+#if JERRY_ESNEXT
 
 /** \addtogroup ecma ECMA
  * @{
@@ -46,7 +46,7 @@ typedef enum
 ecma_value_t
 ecma_op_create_iterator_object (ecma_value_t iterated_value,
                                 ecma_object_t *prototype_obj_p,
-                                ecma_pseudo_array_type_t iterator_type,
+                                ecma_object_class_type_t iterator_type,
                                 ecma_iterator_kind_t kind);
 
 ecma_value_t
@@ -74,7 +74,7 @@ ecma_value_t
 ecma_op_iterator_do (ecma_iterator_command_type_t command, ecma_value_t iterator,
                      ecma_value_t next_method, ecma_value_t value, bool *done_p);
 
-#endif /* ENABLED (JERRY_ESNEXT) */
+#endif /* JERRY_ESNEXT */
 
 /**
  * @}

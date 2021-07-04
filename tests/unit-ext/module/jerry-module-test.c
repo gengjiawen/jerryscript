@@ -138,13 +138,11 @@ static const jerryx_module_resolver_t *resolvers[3] =
 };
 
 static jerry_value_t
-handle_clear_require_cache (const jerry_value_t js_function,
-                            const jerry_value_t this_val,
+handle_clear_require_cache (const jerry_call_info_t *call_info_p,
                             const jerry_value_t args_p[],
                             const jerry_length_t args_count)
 {
-  (void) js_function;
-  (void) this_val;
+  (void) call_info_p;
   (void) args_count;
 
   TEST_ASSERT (args_count == 1);
@@ -154,13 +152,11 @@ handle_clear_require_cache (const jerry_value_t js_function,
 } /* handle_clear_require_cache */
 
 static jerry_value_t
-handle_require (const jerry_value_t js_function,
-                const jerry_value_t this_val,
+handle_require (const jerry_call_info_t *call_info_p,
                 const jerry_value_t args_p[],
                 const jerry_length_t args_count)
 {
-  (void) js_function;
-  (void) this_val;
+  (void) call_info_p;
   (void) args_count;
 
   jerry_value_t return_value = 0;
@@ -214,7 +210,7 @@ main (int argc, char **argv)
   js_property_name = jerry_create_string ((const jerry_char_t *) "require");
   res = jerry_set_property (js_global, js_property_name, js_function);
   TEST_ASSERT (!jerry_value_is_error (res));
-  TEST_ASSERT (jerry_value_is_boolean (res) && jerry_get_boolean_value (res));
+  TEST_ASSERT (jerry_value_is_boolean (res) && jerry_value_is_true (res));
   jerry_release_value (res);
   jerry_release_value (js_property_name);
   jerry_release_value (js_function);
@@ -223,7 +219,7 @@ main (int argc, char **argv)
   js_property_name = jerry_create_string ((const jerry_char_t *) "clear_require_cache");
   res = jerry_set_property (js_global, js_property_name, js_function);
   TEST_ASSERT (!jerry_value_is_error (res));
-  TEST_ASSERT (jerry_value_is_boolean (res) && jerry_get_boolean_value (res));
+  TEST_ASSERT (jerry_value_is_boolean (res) && jerry_value_is_true (res));
   jerry_release_value (res);
   jerry_release_value (js_property_name);
   jerry_release_value (js_function);

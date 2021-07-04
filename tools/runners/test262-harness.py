@@ -55,6 +55,7 @@ import xml.dom.minidom
 from collections import Counter
 
 import signal
+import threading
 import multiprocessing
 
 #######################################################################
@@ -63,6 +64,10 @@ import multiprocessing
 
 M_YAML_LIST_PATTERN = re.compile(r"^\[(.*)\]$")
 M_YAML_MULTILINE_LIST = re.compile(r"^ *- (.*)$")
+
+
+# The timeout of each test case
+TEST262_CASE_TIMEOUT = 180
 
 
 def yaml_load(string):
@@ -129,7 +134,7 @@ def my_maybe_list(value):
 def my_multiline_list(lines, value):
     # assume no explcit indentor (otherwise have to parse value)
     value = []
-    indent = None
+    indent = 0
     while lines:
         line = lines.pop(0)
         leading = my_leading_spaces(line)
@@ -362,6 +367,8 @@ def build_options():
                       help="Command to print from console")
     result.add_option("--list-includes", default=False, action="store_true",
                       help="List includes required by tests")
+    result.add_option("--module-flag", default="-m",
+                      help="List includes required by tests")
     return result
 
 
@@ -427,6 +434,12 @@ class TestResult(object):
     def report_outcome(self, long_format):
         name = self.case.get_name()
         mode = self.case.get_mode()
+
+        if self.exit_code != 0 and self.exit_code != 1:
+            sys.stderr.write(u"===%s failed in %s with negative:%s===\n"
+                             % (name, mode, self.case.get_negative_type()))
+            self.write_output(sys.stderr)
+
         if self.has_unexpected_outcome():
             if self.case.is_negative():
                 print("=== %s passed in %s, but was expected to fail ===" % (name, mode))
@@ -461,10 +474,11 @@ class TestResult(object):
         return 'Test262:AsyncTestComplete' not in self.stdout
 
     def has_unexpected_outcome(self):
+        if self.case.is_negative():
+            return not (self.has_failed() and self.case.negative_match(self.get_error_output()))
+
         if self.case.is_async_test():
             return self.async_has_failed() or self.has_failed()
-        elif self.case.is_negative():
-            return not (self.has_failed() and self.case.negative_match(self.get_error_output()))
 
         return self.has_failed()
 
@@ -476,7 +490,7 @@ class TestResult(object):
 
 class TestCase(object):
 
-    def __init__(self, suite, name, full_path, strict_mode, command_template):
+    def __init__(self, suite, name, full_path, strict_mode, command_template, module_flag):
         self.suite = suite
         self.name = name
         self.full_path = full_path
@@ -490,6 +504,7 @@ class TestCase(object):
         test_record.pop("commentary", None)    # do not throw if missing
         self.test_record = test_record
         self.command_template = command_template
+        self.module_flag = module_flag
 
         self.validate()
 
@@ -537,6 +552,9 @@ class TestCase(object):
 
     def is_async_test(self):
         return 'async' in self.test_record or '$DONE' in self.test
+
+    def is_module(self):
+        return 'module' in self.test_record
 
     def get_include_list(self):
         if self.test_record.get('includes'):
@@ -595,11 +613,14 @@ class TestCase(object):
             logging.info("exec: %s", str(args))
             process = subprocess.Popen(
                 args,
-                shell=is_windows(),
+                shell=False,
                 stdout=stdout.file_desc,
                 stderr=stderr.file_desc
             )
+            timer = threading.Timer(TEST262_CASE_TIMEOUT, process.kill)
+            timer.start()
             code = process.wait()
+            timer.cancel()
             out = stdout.read()
             err = stderr.read()
         finally:
@@ -610,9 +631,16 @@ class TestCase(object):
     def run_test_in(self, tmp):
         tmp.write(self.get_source())
         tmp.close()
+
+        if self.is_module():
+            arg = self.module_flag + ' ' + tmp.name
+        else:
+            arg = tmp.name
+
         command = TestCase.instantiate_template(self.command_template, {
-            'path': tmp.name
+            'path': arg
         })
+
         (code, out, err) = TestCase.execute(command)
         return TestResult(code, out, err, self)
 
@@ -687,15 +715,16 @@ def percent_format(partial, total):
 
 class TestSuite(object):
 
-    def __init__(self, root, strict_only, non_strict_only, unmarked_default, print_handle, exclude_list_path):
-        self.test_root = path.join(root, 'test')
-        self.lib_root = path.join(root, 'harness')
-        self.strict_only = strict_only
-        self.non_strict_only = non_strict_only
-        self.unmarked_default = unmarked_default
-        self.print_handle = print_handle
+    def __init__(self, options):
+        self.test_root = path.join(options.tests, 'test')
+        self.lib_root = path.join(options.tests, 'harness')
+        self.strict_only = options.strict_only
+        self.non_strict_only = options.non_strict_only
+        self.unmarked_default = options.unmarked_default
+        self.print_handle = options.print_handle
         self.include_cache = {}
-        self.exclude_list_path = exclude_list_path
+        self.exclude_list_path = options.exclude_list
+        self.module_flag = options.module_flag
         self.logf = None
 
     def _load_excludes(self):
@@ -764,12 +793,12 @@ class TestSuite(object):
                         print('Excluded: ' + rel_path)
                     else:
                         if not self.non_strict_only:
-                            strict_case = TestCase(self, name, full_path, True, command_template)
+                            strict_case = TestCase(self, name, full_path, True, command_template, self.module_flag)
                             if not strict_case.is_no_strict():
                                 if strict_case.is_only_strict() or self.unmarked_default in ['both', 'strict']:
                                     cases.append(strict_case)
                         if not self.strict_only:
-                            non_strict_case = TestCase(self, name, full_path, False, command_template)
+                            non_strict_case = TestCase(self, name, full_path, False, command_template, self.module_flag)
                             if not non_strict_case.is_only_strict():
                                 if non_strict_case.is_no_strict() or self.unmarked_default in ['both', 'non_strict']:
                                     cases.append(non_strict_case)
@@ -893,12 +922,7 @@ def main():
     (options, args) = parser.parse_args()
     validate_options(options)
 
-    test_suite = TestSuite(options.tests,
-                           options.strict_only,
-                           options.non_strict_only,
-                           options.unmarked_default,
-                           options.print_handle,
-                           options.exclude_list)
+    test_suite = TestSuite(options)
 
     test_suite.validate()
     if options.loglevel == 'debug':

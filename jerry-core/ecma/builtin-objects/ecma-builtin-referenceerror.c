@@ -22,9 +22,11 @@
 #include "ecma-helpers.h"
 #include "ecma-builtin-helpers.h"
 #include "ecma-objects.h"
+#include "ecma-function-object.h"
 #include "jrt.h"
+#include "jcontext.h"
 
-#if ENABLED (JERRY_BUILTIN_ERRORS)
+#if JERRY_BUILTIN_ERRORS
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -52,7 +54,7 @@ ecma_value_t
 ecma_builtin_reference_error_dispatch_call (const ecma_value_t *arguments_list_p, /**< arguments list */
                                             uint32_t arguments_list_len) /**< number of arguments */
 {
-  return ecma_builtin_helper_error_dispatch_call (ECMA_ERROR_REFERENCE, arguments_list_p, arguments_list_len);
+  return ecma_builtin_helper_error_dispatch_call (JERRY_ERROR_REFERENCE, arguments_list_p, arguments_list_len);
 } /* ecma_builtin_reference_error_dispatch_call */
 
 /**
@@ -64,7 +66,29 @@ ecma_value_t
 ecma_builtin_reference_error_dispatch_construct (const ecma_value_t *arguments_list_p, /**< arguments list */
                                                  uint32_t arguments_list_len) /**< number of arguments */
 {
+#if !JERRY_ESNEXT
   return ecma_builtin_reference_error_dispatch_call (arguments_list_p, arguments_list_len);
+#else /* JERRY_ESNEXT */
+  ecma_object_t *proto_p = ecma_op_get_prototype_from_constructor (JERRY_CONTEXT (current_new_target_p),
+                                                                   ECMA_BUILTIN_ID_REFERENCE_ERROR_PROTOTYPE);
+
+  if (proto_p == NULL)
+  {
+    return ECMA_VALUE_ERROR;
+  }
+
+  ecma_value_t result = ecma_builtin_reference_error_dispatch_call (arguments_list_p, arguments_list_len);
+
+  if (!ECMA_IS_VALUE_ERROR (result))
+  {
+    ecma_object_t *object_p = ecma_get_object_from_value (result);
+    ECMA_SET_NON_NULL_POINTER (object_p->u2.prototype_cp, proto_p);
+  }
+
+  ecma_deref_object (proto_p);
+
+  return result;
+#endif /* JERRY_ESNEXT */
 } /* ecma_builtin_reference_error_dispatch_construct */
 
 /**
@@ -73,4 +97,4 @@ ecma_builtin_reference_error_dispatch_construct (const ecma_value_t *arguments_l
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_ERRORS) */
+#endif /* JERRY_BUILTIN_ERRORS */

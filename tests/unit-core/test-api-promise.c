@@ -38,7 +38,7 @@ test_promise_resolve_success (void)
   {
     jerry_value_t obj_key = jerry_create_string ((const jerry_char_t *) "key_one");
     jerry_value_t set_result = jerry_set_property (resolve_value, obj_key, jerry_create_number (3));
-    TEST_ASSERT (jerry_value_is_boolean (set_result) && (jerry_get_boolean_value (set_result) == true));
+    TEST_ASSERT (jerry_value_is_boolean (set_result) && (jerry_value_is_true (set_result)));
     jerry_release_value (set_result);
     jerry_release_value (obj_key);
   }
@@ -157,11 +157,9 @@ test_promise_from_js (void)
 {
   const jerry_char_t test_source[] = "(new Promise(function(rs, rj) { rs(30); })).then(function(v) { return v + 1; })";
 
-  jerry_value_t parsed_code_val = jerry_parse (NULL,
-                                               0,
-                                               test_source,
+  jerry_value_t parsed_code_val = jerry_parse (test_source,
                                                sizeof (test_source) - 1,
-                                               JERRY_PARSE_NO_OPTS);
+                                               NULL);
   TEST_ASSERT (!jerry_value_is_error (parsed_code_val));
 
   jerry_value_t res = jerry_run (parsed_code_val);

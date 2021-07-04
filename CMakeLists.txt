@@ -15,8 +15,11 @@
 cmake_minimum_required (VERSION 2.8.12)
 project (Jerry C)
 
+if(NOT DEFINED PYTHON)
+  set(PYTHON "python")
+endif()
 # Determining version
-execute_process(COMMAND python ${CMAKE_SOURCE_DIR}/tools/version.py
+execute_process(COMMAND ${PYTHON} ${CMAKE_SOURCE_DIR}/tools/version.py
                 OUTPUT_VARIABLE JERRY_VERSION
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
@@ -53,14 +56,16 @@ set(JERRY_CMDLINE_SNAPSHOT  OFF CACHE BOOL "Build jerry snapshot command line to
 set(JERRY_LIBFUZZER         OFF CACHE BOOL "Build jerry with libfuzzer support?")
 set(JERRY_PORT_DEFAULT      ON  CACHE BOOL "Build default jerry port implementation?")
 set(JERRY_EXT               ON  CACHE BOOL "Build jerry-ext?")
-set(JERRY_LIBM              ON  CACHE BOOL "Build and use jerry-libm?")
+set(JERRY_MATH              OFF CACHE BOOL "Build and use jerry-math?")
 set(UNITTESTS               OFF CACHE BOOL "Build unit tests?")
 set(DOCTESTS                OFF CACHE BOOL "Build doc tests?")
 
 # Optional build settings
-set(BUILD_SHARED_LIBS  OFF CACHE BOOL "Build shared libraries?")
-set(ENABLE_LTO         ON  CACHE BOOL "Enable LTO build?")
-set(ENABLE_STRIP       ON  CACHE BOOL "Enable stripping all symbols from release binary?")
+set(BUILD_SHARED_LIBS         OFF CACHE BOOL "Build shared libraries?")
+set(ENABLE_AMALGAM            OFF CACHE BOOL "Enable amalgamated build?")
+set(ENABLE_LTO                ON  CACHE BOOL "Enable LTO build?")
+set(ENABLE_STRIP              ON  CACHE BOOL "Enable stripping all symbols from release binary?")
+set(ENABLE_COMPILE_COMMANDS   ON  CACHE BOOL "Enable generating compile_commands.json?")
 
 # Option overrides
 if(NOT USING_CLANG)
@@ -82,21 +87,17 @@ if(JERRY_CMDLINE OR DOCTESTS)
 endif()
 
 if("${PLATFORM}" STREQUAL "DARWIN")
-  set(JERRY_LIBM         OFF)
   set(ENABLE_LTO         OFF)
   set(ENABLE_STRIP       OFF)
 
-  set(JERRY_LIBM_MESSAGE         " (FORCED BY PLATFORM)")
   set(ENABLE_LTO_MESSAGE         " (FORCED BY PLATFORM)")
   set(ENABLE_STRIP_MESSAGE       " (FORCED BY PLATFORM)")
 endif()
 
 if("${PLATFORM}" STREQUAL "ESP-IDF")
-  set(JERRY_LIBM         OFF)
   set(ENABLE_LTO         OFF)
   set(ENABLE_STRIP       OFF)
 
-  set(JERRY_LIBM_MESSAGE         " (FORCED BY PLATFORM)")
   set(ENABLE_LTO_MESSAGE         " (FORCED BY PLATFORM)")
   set(ENABLE_STRIP_MESSAGE       " (FORCED BY PLATFORM)")
 endif()
@@ -108,10 +109,8 @@ if(USING_TI)
 endif()
 
 if(USING_MSVC)
-  set(JERRY_LIBM         OFF)
   set(ENABLE_STRIP       OFF)
 
-  set(JERRY_LIBM_MESSAGE         " (FORCED BY COMPILER)")
   set(ENABLE_STRIP_MESSAGE       " (FORCED BY COMPILER)")
 endif()
 
@@ -121,14 +120,19 @@ if(CYGWIN OR MINGW OR MSYS)
   set(ENABLE_LTO_MESSAGE         " (FORCED BY PLATFORM)")
 endif()
 
+# Generate compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ${ENABLE_COMPILE_COMMANDS})
+
 # Status messages
 message(STATUS "CMAKE_BUILD_TYPE               " ${CMAKE_BUILD_TYPE})
 message(STATUS "CMAKE_C_COMPILER_ID            " ${CMAKE_C_COMPILER_ID})
 message(STATUS "CMAKE_SYSTEM_NAME              " ${CMAKE_SYSTEM_NAME})
 message(STATUS "CMAKE_SYSTEM_PROCESSOR         " ${CMAKE_SYSTEM_PROCESSOR})
 message(STATUS "BUILD_SHARED_LIBS              " ${BUILD_SHARED_LIBS})
+message(STATUS "ENABLE_AMALGAM                 " ${ENABLE_AMALGAM} ${ENABLE_AMALGAM_MESSAGE})
 message(STATUS "ENABLE_LTO                     " ${ENABLE_LTO} ${ENABLE_LTO_MESSAGE})
 message(STATUS "ENABLE_STRIP                   " ${ENABLE_STRIP} ${ENABLE_STRIP_MESSAGE})
+message(STATUS "ENABLE_COMPILE_COMMANDS        " ${ENABLE_COMPILE_COMMANDS})
 message(STATUS "JERRY_VERSION                  " ${JERRY_VERSION})
 message(STATUS "JERRY_CMDLINE                  " ${JERRY_CMDLINE} ${JERRY_CMDLINE_MESSAGE})
 message(STATUS "JERRY_CMDLINE_TEST             " ${JERRY_CMDLINE_TEST} ${JERRY_CMDLINE_TEST_MESSAGE})
@@ -136,7 +140,7 @@ message(STATUS "JERRY_CMDLINE_SNAPSHOT         " ${JERRY_CMDLINE_SNAPSHOT} ${JER
 message(STATUS "JERRY_LIBFUZZER                " ${JERRY_LIBFUZZER} ${JERRY_LIBFUZZER_MESSAGE})
 message(STATUS "JERRY_PORT_DEFAULT             " ${JERRY_PORT_DEFAULT} ${JERRY_PORT_DEFAULT_MESSAGE})
 message(STATUS "JERRY_EXT                      " ${JERRY_EXT} ${JERRY_EXT_MESSAGE})
-message(STATUS "JERRY_LIBM                     " ${JERRY_LIBM} ${JERRY_LIBM_MESSAGE})
+message(STATUS "JERRY_MATH                     " ${JERRY_MATH} ${JERRY_MATH_MESSAGE})
 message(STATUS "UNITTESTS                      " ${UNITTESTS})
 message(STATUS "DOCTESTS                       " ${DOCTESTS})
 
@@ -207,9 +211,13 @@ endif()
 
 if(USING_GCC OR USING_CLANG)
   jerry_add_compile_flags(-std=c99 -pedantic)
-  # Turn off stack protector
-  jerry_add_compile_flags(-fno-builtin -fno-stack-protector)
-  jerry_add_compile_warnings(all extra format-nonliteral init-self conversion sign-conversion format-security missing-declarations shadow strict-prototypes undef old-style-definition)
+  if(JERRY_MATH)
+    jerry_add_compile_flags(-fno-builtin)
+  endif()
+  jerry_add_compile_warnings(all extra format-nonliteral init-self sign-conversion format-security missing-declarations shadow strict-prototypes undef old-style-definition)
+  if(NOT "${PLATFORM}" STREQUAL "WINDOWS")
+    jerry_add_compile_warnings(conversion)
+  endif()
   jerry_add_compile_flags(-Wno-stack-protector -Wno-attributes -Werror)
 endif()
 
@@ -253,12 +261,12 @@ if(DEFINED EXTERNAL_LINKER_FLAGS)
   jerry_add_link_flags(${EXTERNAL_LINKER_FLAGS})
 endif()
 
-# Used for placeholder to attach single source build targets
-add_custom_target(generate-single-source)
+# Used as placeholder to attach amalgamated build targets to
+add_custom_target(amalgam)
 
 # Jerry's libm
-if(JERRY_LIBM)
-  add_subdirectory(jerry-libm)
+if(JERRY_MATH)
+  add_subdirectory(jerry-math)
 endif()
 
 # Jerry's core
@@ -282,8 +290,8 @@ endif()
 # Unittests
 if(UNITTESTS)
   add_subdirectory(tests/unit-core)
-  if(JERRY_LIBM)
-    add_subdirectory(tests/unit-libm)
+  if(JERRY_MATH)
+    add_subdirectory(tests/unit-math)
   endif()
   if(JERRY_EXT)
     add_subdirectory(tests/unit-ext)

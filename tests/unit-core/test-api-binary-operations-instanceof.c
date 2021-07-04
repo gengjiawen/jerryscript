@@ -28,13 +28,11 @@ typedef struct
 } test_entry_t;
 
 static jerry_value_t
-my_constructor (const jerry_value_t func_val, /**< function */
-                const jerry_value_t this_val, /**< this */
+my_constructor (const jerry_call_info_t *call_info_p, /**< call information */
                 const jerry_value_t argv[], /**< arguments */
                 const jerry_length_t argc) /**< number of arguments */
 {
-  (void) func_val;
-  (void) this_val;
+  (void) call_info_p;
   (void) argv;
   (void) argc;
   return jerry_create_undefined ();
@@ -75,7 +73,7 @@ main (void)
                                                    bool_tests[idx].lhs,
                                                    bool_tests[idx].rhs);
     TEST_ASSERT (!jerry_value_is_error (result));
-    TEST_ASSERT (jerry_get_boolean_value (result) == bool_tests[idx].expected);
+    TEST_ASSERT (jerry_value_is_true (result) == bool_tests[idx].expected);
     jerry_release_value (bool_tests[idx].lhs);
     jerry_release_value (bool_tests[idx].rhs);
     jerry_release_value (result);

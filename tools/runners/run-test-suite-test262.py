@@ -37,6 +37,8 @@ def get_arguments():
                         help='Execution runtime (e.g. qemu)')
     parser.add_argument('--engine', metavar='FILE', required=True,
                         help='JerryScript binary to run tests with')
+    parser.add_argument('--test262-object', action='store_true', default=False,
+                        help='JerryScript engine create test262 object')
     parser.add_argument('--test-dir', metavar='DIR', required=True,
                         help='Directory contains test262 test suite')
     group = parser.add_mutually_exclusive_group(required=True)
@@ -96,6 +98,15 @@ def prepare_test262_test_suite(args):
         path_to_remove = os.path.join(args.test_dir, 'test', 'suite', 'intl402')
         if os.path.isdir(path_to_remove):
             shutil.rmtree(path_to_remove)
+
+    # Since ES2018 iterator's next method is called once during the prologue of iteration,
+    # rather than during each step. The test is incorrect and stuck in an infinite loop.
+    # https://github.com/tc39/test262/pull/1248 fixed the test and it passes on test262-esnext.
+    if args.es2015:
+        test_to_remove = 'test/language/statements/for-of/iterator-next-reference.js'
+        path_to_remove = os.path.join(args.test_dir, os.path.normpath(test_to_remove))
+        if os.path.isfile(path_to_remove):
+            os.remove(path_to_remove)
 
     return 0
 
@@ -173,12 +184,8 @@ def main(args):
         util.set_timezone('Pacific Standard Time')
 
     command = (args.runtime + ' ' + args.engine).strip()
-    if args.es2015 or args.esnext:
-        try:
-            subprocess.check_output(["timeout", "--version"])
-            command = "timeout 5 " + command
-        except subprocess.CalledProcessError:
-            pass
+    if args.test262_object:
+        command += ' --test262-object'
 
     kwargs = {}
     if sys.version_info.major >= 3:

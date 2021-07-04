@@ -19,7 +19,7 @@
 
 #include "ecma-builtin-helpers-macro-defines.inc.h"
 
-#if ENABLED (JERRY_BUILTIN_BIGINT)
+#if JERRY_BUILTIN_BIGINT
 
 /* Object properties:
  *  (property name, object pointer getter) */
@@ -36,9 +36,10 @@ STRING_VALUE (LIT_GLOBAL_SYMBOL_TO_STRING_TAG,
 
 /* Routine properties:
  *  (property name, C routine name, arguments number or NON_FIXED, value of the routine's length property) */
-ROUTINE (LIT_MAGIC_STRING_VALUE_OF_UL, ecma_builtin_bigint_prototype_object_value_of, 0, 0)
-ROUTINE (LIT_MAGIC_STRING_TO_STRING_UL, ecma_builtin_bigint_prototype_object_to_string, NON_FIXED, 0)
+ROUTINE (LIT_MAGIC_STRING_TO_STRING_UL, ECMA_BIGINT_PROTOTYPE_TO_STRING, NON_FIXED, 0)
+ROUTINE (LIT_MAGIC_STRING_VALUE_OF_UL, ECMA_BIGINT_PROTOTYPE_VALUE_OF, 0, 0)
+ROUTINE (LIT_MAGIC_STRING_TO_LOCALE_STRING_UL, ECMA_BIGINT_PROTOTYPE_TO_LOCALE_STRING, 0, 0)
 
-#endif /* ENABLED (JERRY_BUILTIN_BIGINT) */
+#endif /* JERRY_BUILTIN_BIGINT */
 
 #include "ecma-builtin-helpers-macro-undefs.inc.h"

@@ -58,13 +58,11 @@ assert (pdemo.value === 13);
 static int demo_value = 0;
 
 static jerry_value_t
-handler_get (const jerry_value_t function_obj, /**< function object */
-                   const jerry_value_t this_val, /**< this arg */
-                   const jerry_value_t args_p[], /**< function arguments */
-                   const jerry_length_t args_count) /**< number of function arguments */
+handler_get (const jerry_call_info_t *call_info_p, /**< call information */
+             const jerry_value_t args_p[], /**< function arguments */
+             const jerry_length_t args_count) /**< number of function arguments */
 {
-  JERRY_UNUSED (function_obj);
-  JERRY_UNUSED (this_val);
+  JERRY_UNUSED (call_info_p);
 
   TEST_ASSERT (args_count == 3);
   TEST_ASSERT (jerry_value_is_object (args_p[0])); /* target */
@@ -84,13 +82,11 @@ handler_get (const jerry_value_t function_obj, /**< function object */
 } /* handler_get */
 
 static jerry_value_t
-handler_set (const jerry_value_t function_obj, /**< function object */
-                   const jerry_value_t this_val, /**< this arg */
-                   const jerry_value_t args_p[], /**< function arguments */
-                   const jerry_length_t args_count) /**< number of function arguments */
+handler_set (const jerry_call_info_t *call_info_p, /**< call information */
+             const jerry_value_t args_p[], /**< function arguments */
+             const jerry_length_t args_count) /**< number of function arguments */
 {
-  JERRY_UNUSED (function_obj);
-  JERRY_UNUSED (this_val);
+  JERRY_UNUSED (call_info_p);
   JERRY_UNUSED (args_p);
   JERRY_UNUSED (args_count);
 
@@ -122,7 +118,7 @@ set_property (jerry_value_t target, /**< target object */
   jerry_value_t result_val = jerry_set_property (target, name_val, value);
 
   TEST_ASSERT (jerry_value_is_boolean (result_val));
-  TEST_ASSERT (jerry_get_boolean_value (result_val));
+  TEST_ASSERT (jerry_value_is_true (result_val));
   jerry_release_value (name_val);
 } /* set_property */
 
@@ -147,6 +143,81 @@ set_function (jerry_value_t target, /**< target object */
   set_property (target, name_p, function_val);
   jerry_release_value (function_val);
 } /* set_function */
+
+struct test_data
+{
+  int value;
+};
+
+static void
+proxy_native_freecb (void *native_p, /**< native pointer */
+                     jerry_object_native_info_t *info_p) /**< native info */
+{
+  TEST_ASSERT (native_p != NULL);
+  TEST_ASSERT (info_p->free_cb == proxy_native_freecb);
+  struct test_data *data_p = (struct test_data *) native_p;
+  data_p->value = -1;
+} /* proxy_native_freecb */
+
+static const jerry_object_native_info_t proxy_native_info =
+{
+  .free_cb = proxy_native_freecb,
+  .number_of_references = 0,
+  .offset_of_references = 0,
+};
+
+static jerry_value_t
+proxy_native_handler_get (const jerry_call_info_t *call_info_p, /**< call information */
+                          const jerry_value_t args_p[], /**< function arguments */
+                          const jerry_length_t args_count) /**< number of function arguments */
+{
+  JERRY_UNUSED (call_info_p);
+  TEST_ASSERT (args_count == 3);
+
+  /* 3rd argument (Receiver) should be the Proxy here. */
+  jerry_value_t receiver = args_p[2];
+  TEST_ASSERT (jerry_value_is_proxy (receiver));
+
+  /* Check if proxy has the native ptr. */
+  struct test_data *native_p;
+  bool has_p = jerry_get_object_native_pointer (receiver, (void *) &native_p, &proxy_native_info);
+  TEST_ASSERT (has_p == true);
+
+  native_p->value <<= 1;
+  return jerry_create_number (native_p->value);
+} /* proxy_native_handler_get */
+
+/**
+ * Test Proxy with added native object.
+ */
+static void
+test_proxy_native (void)
+{
+  jerry_value_t handler = jerry_create_object ();
+  set_function (handler, "get", proxy_native_handler_get);
+
+  jerry_value_t target = jerry_create_object ();
+  jerry_value_t proxy = jerry_create_proxy (target, handler);
+
+  struct test_data *data = (struct test_data *) malloc (sizeof (struct test_data));
+  data->value = 2;
+  jerry_set_object_native_pointer (proxy, data, &proxy_native_info);
+
+  /* Call: proxy[10] */
+  jerry_value_t result_for_10 = jerry_get_property_by_index (proxy, 10);
+  TEST_ASSERT (jerry_value_is_number (result_for_10));
+  TEST_ASSERT (jerry_get_number_value (result_for_10) == 4.0);
+
+  /* Call: proxy[5] */
+  data->value = 8;
+  jerry_value_t result_for_5 = jerry_get_property_by_index (proxy, 5);
+  TEST_ASSERT (jerry_value_is_number (result_for_5));
+  TEST_ASSERT (jerry_get_number_value (result_for_5) == 16.0);
+
+  jerry_release_value (handler);
+  jerry_release_value (target);
+  jerry_release_value (proxy);
+} /* test_proxy_native */
 
 int
 main (void)
@@ -176,11 +247,9 @@ main (void)
   }
 
   const jerry_char_t get_value_src[] = TEST_STRING_LITERAL ("pdemo.value");
-  jerry_value_t parsed_get_code_val = jerry_parse (NULL,
-                                               0,
-                                               get_value_src,
-                                               sizeof (get_value_src) - 1,
-                                               JERRY_PARSE_NO_OPTS);
+  jerry_value_t parsed_get_code_val = jerry_parse (get_value_src,
+                                                   sizeof (get_value_src) - 1,
+                                                   NULL);
   TEST_ASSERT (!jerry_value_is_error (parsed_get_code_val));
 
   {
@@ -205,11 +274,9 @@ main (void)
   }
 
   const jerry_char_t set_value_src[] = TEST_STRING_LITERAL ("pdemo.value = 55");
-  jerry_value_t parsed_set_code_val = jerry_parse (NULL,
-                                                   0,
-                                                   set_value_src,
+  jerry_value_t parsed_set_code_val = jerry_parse (set_value_src,
                                                    sizeof (set_value_src) - 1,
-                                                   JERRY_PARSE_NO_OPTS);
+                                                   NULL);
   TEST_ASSERT (!jerry_value_is_error (parsed_set_code_val));
 
   {
@@ -249,11 +316,9 @@ main (void)
     const jerry_char_t has_value_src[] = TEST_STRING_LITERAL ("new Proxy({}, {\n"
                                                               "  has: function(target, key) { throw 33 }\n"
                                                               "})");
-    jerry_value_t parsed_has_code_val = jerry_parse (NULL,
-                                                     0,
-                                                     has_value_src,
+    jerry_value_t parsed_has_code_val = jerry_parse (has_value_src,
                                                      sizeof (has_value_src) - 1,
-                                                     JERRY_PARSE_NO_OPTS);
+                                                     NULL);
     TEST_ASSERT (!jerry_value_is_error (parsed_has_code_val));
 
     jerry_value_t res = jerry_run (parsed_has_code_val);
@@ -271,6 +336,38 @@ main (void)
     TEST_ASSERT (jerry_get_number_value (property) == 33);
     jerry_release_value (property);
   }
+
+  target = jerry_create_object ();
+  handler = jerry_create_object ();
+  proxy = jerry_create_proxy (target, handler);
+
+  {
+    jerry_value_t res = jerry_get_proxy_target (proxy);
+    TEST_ASSERT (res == target);
+    jerry_release_value (res);
+
+    res = jerry_get_proxy_handler (proxy);
+    TEST_ASSERT (res == handler);
+    jerry_release_value (res);
+
+    res = jerry_get_proxy_target (target);
+    TEST_ASSERT (jerry_value_is_error (res));
+    res = jerry_get_value_from_error (res, true);
+    TEST_ASSERT (jerry_get_error_type (res) == JERRY_ERROR_TYPE);
+    jerry_release_value (res);
+
+    res = jerry_get_proxy_handler (handler);
+    TEST_ASSERT (jerry_value_is_error (res));
+    res = jerry_get_value_from_error (res, true);
+    TEST_ASSERT (jerry_get_error_type (res) == JERRY_ERROR_TYPE);
+    jerry_release_value (res);
+  }
+
+  jerry_release_value (proxy);
+  jerry_release_value (handler);
+  jerry_release_value (target);
+
+  test_proxy_native ();
 
   jerry_cleanup ();
   return 0;

@@ -24,7 +24,71 @@ if(${FEATURE_PROFILE} STREQUAL "${CMAKE_SOURCE_DIR}/jerry-core/profiles/minimal.
 endif()
 
 # Unit tests main modules
-file(GLOB SOURCE_UNIT_TEST_MAIN_MODULES *.c)
+set(SOURCE_UNIT_TEST_MAIN_MODULES
+  test-abort.c
+  test-api-binary-operations-arithmetics.c
+  test-api-binary-operations-comparisons.c
+  test-api-binary-operations-instanceof.c
+  test-api-errortype.c
+  test-api-functiontype.c
+  test-api-iteratortype.c
+  test-api-object-property-names.c
+  test-api-objecttype.c
+  test-api-promise.c
+  test-api-property.c
+  test-api-set-and-clear-error-flag.c
+  test-api-strings.c
+  test-api-value-type.c
+  test-api.c
+  test-arraybuffer.c
+  test-backtrace.c
+  test-bigint.c
+  test-container.c
+  test-context-data.c
+  test-dataview.c
+  test-date-helpers.c
+  test-exec-stop.c
+  test-external-string.c
+  test-from-property-descriptor.c
+  test-get-own-property.c
+  test-has-property.c
+  test-internal-properties.c
+  test-jmem.c
+  test-json.c
+  test-lit-char-helpers.c
+  test-literal-storage.c
+  test-mem-stats.c
+  test-module.c
+  test-native-callback-nested.c
+  test-native-instanceof.c
+  test-native-pointer.c
+  test-newtarget.c
+  test-number-converter.c
+  test-number-to-int32.c
+  test-number-to-string.c
+  test-objects-foreach.c
+  test-poolman.c
+  test-promise-callback.c
+  test-promise.c
+  test-proxy.c
+  test-realm.c
+  test-regexp-dotall-unicode.c
+  test-error-callback.c
+  test-regexp.c
+  test-regression-3588.c
+  test-resource-name.c
+  test-snapshot.c
+  test-special-proxy.c
+  test-string-to-number.c
+  test-stringbuilder.c
+  test-strings.c
+  test-symbol.c
+  test-to-integer.c
+  test-to-length.c
+  test-to-property-descriptor.c
+  test-typedarray.c
+  test-unicode.c
+)
 
 # jerry_heap_stats_t.size == 0 if system allocator is used.
 if(JERRY_SYSTEM_ALLOCATOR)

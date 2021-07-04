@@ -63,8 +63,10 @@ def get_arguments():
                           help='add custom argument to CMake')
     buildgrp.add_argument('--compile-flag', metavar='OPT', action='append', default=[],
                           help='add custom compile flag')
-    buildgrp.add_argument('--debug', action='store_const', const='Debug', dest='build_type',
-                          default='MinSizeRel', help='debug build')
+    buildgrp.add_argument('--build-type', metavar='TYPE', default='MinSizeRel',
+                          help='set build type (default: %(default)s)')
+    buildgrp.add_argument('--debug', dest='build_type', action='store_const', const='Debug', default=argparse.SUPPRESS,
+                          help='debug build (alias for --build-type %(const)s)')
     buildgrp.add_argument('--install', metavar='DIR', nargs='?', default=None, const=False,
                           help='install after build (default: don\'t install; '
                                'default directory if install: OS-specific)')
@@ -74,6 +76,8 @@ def get_arguments():
                           help='add custom library to be linked')
     buildgrp.add_argument('--linker-flag', metavar='OPT', action='append', default=[],
                           help='add custom linker flag')
+    buildgrp.add_argument('--amalgam', metavar='X', choices=['ON', 'OFF'], type=str.upper,
+                          help='enable amalgamated build (%(choices)s)')
     buildgrp.add_argument('--lto', metavar='X', choices=['ON', 'OFF'], type=str.upper,
                           help='enable link-time optimizations (%(choices)s)')
     buildgrp.add_argument('--shared-libs', metavar='X', choices=['ON', 'OFF'], type=str.upper,
@@ -98,16 +102,14 @@ def get_arguments():
                          help=devhelp('build jerry with libfuzzer support (%(choices)s)'))
     compgrp.add_argument('--jerry-ext', metavar='X', choices=['ON', 'OFF'], type=str.upper,
                          help='build jerry-ext (%(choices)s)')
-    compgrp.add_argument('--jerry-libm', metavar='X', choices=['ON', 'OFF'], type=str.upper,
-                         help='build and use jerry-libm (%(choices)s)')
+    compgrp.add_argument('--jerry-math', metavar='X', choices=['ON', 'OFF'], type=str.upper,
+                         help='build and use jerry-math (%(choices)s)')
     compgrp.add_argument('--jerry-port-default', metavar='X', choices=['ON', 'OFF'], type=str.upper,
                          help='build default jerry port implementation (%(choices)s)')
     compgrp.add_argument('--unittests', metavar='X', choices=['ON', 'OFF'], type=str.upper,
                          help=devhelp('build unittests (%(choices)s)'))
 
     coregrp = parser.add_argument_group('jerry-core options')
-    coregrp.add_argument('--all-in-one', metavar='X', choices=['ON', 'OFF'], type=str.upper,
-                         help='all-in-one build (%(choices)s)')
     coregrp.add_argument('--cpointer-32bit', metavar='X', choices=['ON', 'OFF'], type=str.upper,
                          help='enable 32 bit compressed pointers (%(choices)s)')
     coregrp.add_argument('--error-messages', metavar='X', choices=['ON', 'OFF'], type=str.upper,
@@ -136,6 +138,8 @@ def get_arguments():
                          help=devhelp('enable mem-stress test (%(choices)s)'))
     coregrp.add_argument('--profile', metavar='FILE',
                          help='specify profile file')
+    coregrp.add_argument('--promise-callback', metavar='X', choices=['ON', 'OFF'], type=str.upper,
+                         help='enable promise callback (%(choices)s)')
     coregrp.add_argument('--regexp-strict-mode', metavar='X', choices=['ON', 'OFF'], type=str.upper,
                          help=devhelp('enable regexp strict mode (%(choices)s)'))
     coregrp.add_argument('--show-opcodes', metavar='X', choices=['ON', 'OFF'], type=str.upper,
@@ -156,6 +160,8 @@ def get_arguments():
     maingrp = parser.add_argument_group('jerry-main options')
     maingrp.add_argument('--link-map', metavar='X', choices=['ON', 'OFF'], type=str.upper,
                          help=devhelp('enable the generation of link map for jerry command line tool (%(choices)s)'))
+    maingrp.add_argument('--compile-commands', metavar='X', choices=['ON', 'OFF'], type=str.upper,
+                         help=devhelp('enable the generation of compile_commands.json (%(choices)s)'))
 
     arguments = parser.parse_args(args)
     if arguments.devhelp:
@@ -176,6 +182,7 @@ def generate_build_options(arguments):
     build_options_append('EXTERNAL_COMPILE_FLAGS', ' '.join(arguments.compile_flag))
     build_options_append('EXTERNAL_LINK_LIBS', ' '.join(arguments.link_lib))
     build_options_append('EXTERNAL_LINKER_FLAGS', ' '.join(arguments.linker_flag))
+    build_options_append('ENABLE_AMALGAM', arguments.amalgam)
     build_options_append('ENABLE_LTO', arguments.lto)
     build_options_append('BUILD_SHARED_LIBS', arguments.shared_libs)
     build_options_append('ENABLE_STRIP', arguments.strip)
@@ -189,12 +196,11 @@ def generate_build_options(arguments):
     build_options_append('JERRY_CMDLINE_TEST', arguments.jerry_cmdline_test)
     build_options_append('JERRY_LIBFUZZER', arguments.libfuzzer)
     build_options_append('JERRY_EXT', arguments.jerry_ext)
-    build_options_append('JERRY_LIBM', arguments.jerry_libm)
+    build_options_append('JERRY_MATH', arguments.jerry_math)
     build_options_append('JERRY_PORT_DEFAULT', arguments.jerry_port_default)
     build_options_append('UNITTESTS', arguments.unittests)
 
     # jerry-core options
-    build_options_append('ENABLE_ALL_IN_ONE', arguments.all_in_one)
     build_options_append('JERRY_CPOINTER_32_BIT', arguments.cpointer_32bit)
     build_options_append('JERRY_ERROR_MESSAGES', arguments.error_messages)
     build_options_append('JERRY_EXTERNAL_CONTEXT', arguments.external_context)
@@ -208,6 +214,7 @@ def generate_build_options(arguments):
     build_options_append('JERRY_MEM_STATS', arguments.mem_stats)
     build_options_append('JERRY_MEM_GC_BEFORE_EACH_ALLOC', arguments.mem_stress_test)
     build_options_append('JERRY_PROFILE', arguments.profile)
+    build_options_append('JERRY_PROMISE_CALLBACK', arguments.promise_callback)
     build_options_append('JERRY_REGEXP_STRICT_MODE', arguments.regexp_strict_mode)
     build_options_append('JERRY_PARSER_DUMP_BYTE_CODE', arguments.show_opcodes)
     build_options_append('JERRY_REGEXP_DUMP_BYTE_CODE', arguments.show_regexp_opcodes)
@@ -222,6 +229,7 @@ def generate_build_options(arguments):
 
     # jerry-main options
     build_options_append('ENABLE_LINK_MAP', arguments.link_map)
+    build_options_append('ENABLE_COMPILE_COMMANDS', arguments.compile_commands)
 
     # general build options (final step)
     if arguments.cmake_param:
@@ -264,7 +272,7 @@ def make_jerry(arguments):
     return proc.returncode
 
 def install_jerry(arguments):
-    install_target = 'INSTALL' if sys.platform == 'win32' else 'install'
+    install_target = 'INSTALL' if os.path.exists(os.path.join(arguments.builddir, 'Jerry.sln')) else 'install'
     make_cmd = ['cmake', '--build', arguments.builddir, '--config', arguments.build_type, '--target', install_target]
     return subprocess.call(make_cmd)
 

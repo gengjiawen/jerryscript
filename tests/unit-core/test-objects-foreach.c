@@ -93,10 +93,7 @@ static void
 test_internal_prop (void)
 {
   /* Make sure that the object is initialized in the engine. */
-  {
-    jerry_value_t object = jerry_create_object ();
-    jerry_release_value (object);
-  }
+  jerry_value_t object_dummy = jerry_create_object ();
 
   /* Get the number of iterable objects. */
   int before_object_count = 0;
@@ -130,18 +127,23 @@ test_internal_prop (void)
   }
 
   jerry_release_value (object);
+  jerry_release_value (object_dummy);
 } /* test_internal_prop */
 
 static int test_data = 1;
 
-static void free_test_data (void *data_p)
+static void free_test_data (void *native_p, /**< native pointer */
+                            jerry_object_native_info_t *info_p) /**< native info */
 {
-  TEST_ASSERT ((int *) data_p == &test_data);
+  TEST_ASSERT ((int *) native_p == &test_data);
+  TEST_ASSERT (info_p->free_cb == free_test_data);
 } /* free_test_data */
 
 static const jerry_object_native_info_t test_info =
 {
-  .free_cb = free_test_data
+  .free_cb = free_test_data,
+  .number_of_references = 0,
+  .offset_of_references = 0,
 };
 
 static const jerry_char_t strict_equal_source[] = "var x = function(a, b) {return a === b;}; x";
@@ -166,7 +168,7 @@ find_test_object_by_property (const jerry_value_t candidate,
   jerry_value_t *args_p = (jerry_value_t *) context_p;
   jerry_value_t result = jerry_has_property (candidate, args_p[0]);
 
-  bool has_property = (!jerry_value_is_error (result) && jerry_get_boolean_value (result));
+  bool has_property = (!jerry_value_is_error (result) && jerry_value_is_true (result));
 
   /* If the object has the desired property, store a new reference to it in args_p[1]. */
   if (has_property)
@@ -185,12 +187,13 @@ main (void)
 {
   jerry_init (JERRY_INIT_EMPTY);
 
+  jerry_parse_options_t parse_options;
+  parse_options.options = JERRY_PARSE_STRICT_MODE;
+
   /* Render strict-equal as a function. */
-  jerry_value_t parse_result = jerry_parse (NULL,
-                                            0,
-                                            strict_equal_source,
+  jerry_value_t parse_result = jerry_parse (strict_equal_source,
                                             sizeof (strict_equal_source) - 1,
-                                            JERRY_PARSE_STRICT_MODE);
+                                            &parse_options);
   TEST_ASSERT (!jerry_value_is_error (parse_result));
   jerry_value_t strict_equal = jerry_run (parse_result);
   TEST_ASSERT (!jerry_value_is_error (strict_equal));
@@ -209,7 +212,7 @@ main (void)
   /* Assert that the correct object was retrieved. */
   jerry_value_t undefined = jerry_create_undefined ();
   jerry_value_t strict_equal_result = jerry_call_function (strict_equal, undefined, args, 2);
-  TEST_ASSERT (jerry_value_is_boolean (strict_equal_result) && jerry_get_boolean_value (strict_equal_result));
+  TEST_ASSERT (jerry_value_is_boolean (strict_equal_result) && jerry_value_is_true (strict_equal_result));
   jerry_release_value (strict_equal_result);
   jerry_release_value (found_object);
   jerry_release_value (object);
@@ -234,7 +237,7 @@ main (void)
   /* Assert that the right object was retrieved and release both the original reference to it and the retrieved one. */
   args[0] = object;
   strict_equal_result = jerry_call_function (strict_equal, undefined, args, 2);
-  TEST_ASSERT (jerry_value_is_boolean (strict_equal_result) && jerry_get_boolean_value (strict_equal_result));
+  TEST_ASSERT (jerry_value_is_boolean (strict_equal_result) && jerry_value_is_true (strict_equal_result));
   jerry_release_value (strict_equal_result);
   jerry_release_value (args[0]);
   jerry_release_value (args[1]);

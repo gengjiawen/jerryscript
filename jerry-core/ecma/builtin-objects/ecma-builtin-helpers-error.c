@@ -37,7 +37,7 @@
  * @return ecma value
  */
 ecma_value_t
-ecma_builtin_helper_error_dispatch_call (ecma_standard_error_t error_type, /**< native error type */
+ecma_builtin_helper_error_dispatch_call (jerry_error_t error_type, /**< native error type */
                                          const ecma_value_t *arguments_list_p, /**< arguments list */
                                          uint32_t arguments_list_len) /**< number of arguments */
 {
@@ -53,14 +53,13 @@ ecma_builtin_helper_error_dispatch_call (ecma_standard_error_t error_type, /**< 
       return ECMA_VALUE_ERROR;
     }
 
-    ecma_object_t *new_error_object_p = ecma_new_standard_error_with_message (error_type,
-                                                                              message_string_p);
+    ecma_object_t *new_error_object_p = ecma_new_standard_error (error_type, message_string_p);
 
     ecma_deref_ecma_string (message_string_p);
     return ecma_make_object_value (new_error_object_p);
   }
 
-  ecma_object_t *new_error_object_p = ecma_new_standard_error (error_type);
+  ecma_object_t *new_error_object_p = ecma_new_standard_error (error_type, NULL);
 
   return ecma_make_object_value (new_error_object_p);
 } /* ecma_builtin_helper_error_dispatch_call */

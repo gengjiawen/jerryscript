@@ -38,17 +38,14 @@ register_js_value (const char *name_p, /**< name of the function */
 } /* register_js_value */
 
 static jerry_value_t
-assert_handler (const jerry_value_t func_obj_val, /**< function object */
-                const jerry_value_t this_val, /**< this arg */
+assert_handler (const jerry_call_info_t *call_info_p, /**< call information */
                 const jerry_value_t args_p[], /**< function arguments */
                 const jerry_length_t args_cnt) /**< number of function arguments */
 {
-  JERRY_UNUSED (func_obj_val);
-  JERRY_UNUSED (this_val);
+  JERRY_UNUSED (call_info_p);
 
   if (args_cnt > 0
-      && jerry_value_is_boolean (args_p[0])
-      && jerry_get_boolean_value (args_p[0]))
+      && jerry_value_is_true (args_p[0]))
   {
     return jerry_create_boolean (true);
   }
@@ -57,7 +54,8 @@ assert_handler (const jerry_value_t func_obj_val, /**< function object */
       && jerry_value_is_string (args_p[1]))
   {
     jerry_length_t utf8_sz = jerry_get_string_size (args_p[1]);
-    JERRY_VLA (char, string_from_utf8, utf8_sz);
+    TEST_ASSERT (utf8_sz <= 127); /* 127 is the expected max assert fail message size. */
+    JERRY_VLA (char, string_from_utf8, utf8_sz + 1);
     string_from_utf8[utf8_sz] = 0;
 
     jerry_string_to_char_buffer (args_p[1], (jerry_char_t *) string_from_utf8, utf8_sz);
@@ -312,13 +310,11 @@ main (void)
   /* Test ArrayBuffer external memory map/unmap */
   {
     const uint32_t buffer_size = 20;
-    /* cppcheck-suppress variableScope */
     JERRY_VLA (uint8_t, buffer_p, buffer_size);
-    {
-      jerry_value_t input_buffer = jerry_create_arraybuffer_external (buffer_size, buffer_p, NULL);
-      register_js_value ("input_buffer", input_buffer);
-      jerry_release_value (input_buffer);
-    }
+
+    jerry_value_t input_buffer = jerry_create_arraybuffer_external (buffer_size, buffer_p, NULL);
+    register_js_value ("input_buffer", input_buffer);
+    jerry_release_value (input_buffer);
 
     const jerry_char_t eval_arraybuffer_src[] = TEST_STRING_LITERAL (
       "var array = new Uint8Array(input_buffer);"
@@ -382,7 +378,7 @@ main (void)
 
     jerry_value_t is_detachable = jerry_is_arraybuffer_detachable (arraybuffer);
     TEST_ASSERT (!jerry_value_is_error (is_detachable));
-    TEST_ASSERT (jerry_get_boolean_value (is_detachable));
+    TEST_ASSERT (jerry_value_is_true (is_detachable));
     TEST_ASSERT (jerry_get_arraybuffer_byte_length (arraybuffer) == length);
     jerry_release_value (is_detachable);
 
@@ -406,7 +402,7 @@ main (void)
 
     jerry_value_t is_detachable = jerry_is_arraybuffer_detachable (arraybuffer);
     TEST_ASSERT (!jerry_value_is_error (is_detachable));
-    TEST_ASSERT (jerry_get_boolean_value (is_detachable));
+    TEST_ASSERT (jerry_value_is_true (is_detachable));
     TEST_ASSERT (jerry_get_arraybuffer_byte_length (arraybuffer) == length);
     jerry_release_value (is_detachable);
 
@@ -417,7 +413,7 @@ main (void)
 
     is_detachable = jerry_is_arraybuffer_detachable (arraybuffer);
     TEST_ASSERT (!jerry_value_is_error (is_detachable));
-    TEST_ASSERT (!jerry_get_boolean_value (is_detachable));
+    TEST_ASSERT (!jerry_value_is_true (is_detachable));
     jerry_release_value (is_detachable);
 
     jerry_release_value (res);
@@ -435,7 +431,7 @@ main (void)
 
     jerry_value_t is_detachable = jerry_is_arraybuffer_detachable (arraybuffer);
     TEST_ASSERT (!jerry_value_is_error (is_detachable));
-    TEST_ASSERT (jerry_get_boolean_value (is_detachable));
+    TEST_ASSERT (jerry_value_is_true (is_detachable));
     TEST_ASSERT (jerry_get_arraybuffer_byte_length (arraybuffer) == length);
     jerry_release_value (is_detachable);
 
@@ -447,7 +443,7 @@ main (void)
 
     is_detachable = jerry_is_arraybuffer_detachable (arraybuffer);
     TEST_ASSERT (!jerry_value_is_error (is_detachable));
-    TEST_ASSERT (!jerry_get_boolean_value (is_detachable));
+    TEST_ASSERT (!jerry_value_is_true (is_detachable));
     jerry_release_value (is_detachable);
 
     jerry_release_value (res);

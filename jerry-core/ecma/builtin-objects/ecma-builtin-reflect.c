@@ -25,7 +25,7 @@
 #include "ecma-proxy-object.h"
 #include "jcontext.h"
 
-#if ENABLED (JERRY_BUILTIN_REFLECT)
+#if JERRY_BUILTIN_REFLECT
 
 #define ECMA_BUILTINS_INTERNAL
 #include "ecma-builtins-internal.h"
@@ -91,7 +91,7 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
     /* 1. */
     if (arguments_number == 0 || !ecma_is_value_object (arguments_list[0]))
     {
-      return ecma_raise_type_error (ECMA_ERR_MSG ("Argument is not an Object."));
+      return ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_argument_is_not_an_object));
     }
 
     /* 2. */
@@ -159,7 +159,7 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
     /* 1. */
     if (arguments_number == 0 || !ecma_is_value_object (arguments_list[0]))
     {
-      return ecma_raise_type_error (ECMA_ERR_MSG ("Argument is not an Object."));
+      return ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_argument_is_not_an_object));
     }
 
     ecma_object_t *target_p = ecma_get_object_from_value (arguments_list[0]);
@@ -167,12 +167,12 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
     /* 2. */
     ecma_collection_t *prop_names = ecma_op_object_own_property_keys (target_p);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
     if (prop_names == NULL)
     {
       return ECMA_VALUE_ERROR;
     }
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
     /* 3. */
     return ecma_op_new_array_object_from_collection (prop_names, false);
@@ -183,7 +183,7 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
     /* 1. */
     if (arguments_number < 1 || !ecma_is_constructor (arguments_list[0]))
     {
-      return ecma_raise_type_error (ECMA_ERR_MSG ("Target is not a constructor"));
+      return ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_target_is_not_a_constructor));
     }
 
     ecma_object_t *target_p = ecma_get_object_from_value (arguments_list[0]);
@@ -196,7 +196,7 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
       /* 3. */
       if (!ecma_is_constructor (arguments_list[2]))
       {
-        return ecma_raise_type_error (ECMA_ERR_MSG ("Target is not a constructor"));
+        return ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_target_is_not_a_constructor));
       }
 
       new_target_p = ecma_get_object_from_value (arguments_list[2]);
@@ -205,7 +205,7 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
     /* 4. */
     if (arguments_number < 2)
     {
-      return ecma_raise_type_error (ECMA_ERR_MSG ("Reflect.construct requires the second argument be an object"));
+      return ecma_raise_type_error (ECMA_ERR_MSG ("Reflect.construct expects an object as second argument"));
     }
 
     ecma_collection_t *coll_p = ecma_op_create_list_from_array_like (arguments_list[1], false);
@@ -226,7 +226,7 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
 
   if (!ecma_is_value_object (arguments_list[0]))
   {
-    return ecma_raise_type_error (ECMA_ERR_MSG ("Argument is not an Object."));
+    return ecma_raise_type_error (ECMA_ERR_MSG (ecma_error_argument_is_not_an_object));
   }
 
   switch (builtin_routine_id)
@@ -239,19 +239,19 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
     {
       if (!ecma_is_value_object (arguments_list[1]) && !ecma_is_value_null (arguments_list[1]))
       {
-        return ecma_raise_type_error (ECMA_ERR_MSG ("proto is neither Object nor Null."));
+        return ecma_raise_type_error (ECMA_ERR_MSG ("Prototype is neither object nor null"));
       }
 
       ecma_object_t *obj_p = ecma_get_object_from_value (arguments_list[0]);
       ecma_value_t status;
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
       if (ECMA_OBJECT_IS_PROXY (obj_p))
       {
         status = ecma_proxy_object_set_prototype_of (obj_p, arguments_list[1]);
       }
       else
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
       {
         status = ecma_op_ordinary_object_set_prototype_of (obj_p, arguments_list[1]);
       }
@@ -262,7 +262,7 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
     {
       if (!ecma_op_is_callable (arguments_list[0]))
       {
-        return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a function."));
+        return ecma_raise_type_error (ECMA_ERR_MSG ("Argument 'this' is not a function"));
       }
 
       ecma_object_t *func_obj_p = ecma_get_object_from_value (arguments_list[0]);
@@ -327,12 +327,12 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
       JERRY_ASSERT (builtin_routine_id == ECMA_REFLECT_OBJECT_PREVENT_EXTENSIONS);
       ecma_object_t *obj_p = ecma_get_object_from_value (arguments_list[0]);
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
       if (ECMA_OBJECT_IS_PROXY (obj_p))
       {
         return ecma_proxy_object_prevent_extensions (obj_p);
       }
-#endif /* !ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* !JERRY_BUILTIN_PROXY */
 
       ecma_op_ordinary_object_prevent_extensions (obj_p);
 
@@ -347,4 +347,4 @@ ecma_builtin_reflect_dispatch_routine (uint8_t builtin_routine_id, /**< built-in
  * @}
  */
 
-#endif /* ENABLED (JERRY_BUILTIN_REFLECT) */
+#endif /* JERRY_BUILTIN_REFLECT */

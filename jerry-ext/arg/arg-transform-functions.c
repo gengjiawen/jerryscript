@@ -132,7 +132,7 @@ jerryx_arg_helper_process_double (double *d, /**< [in, out] the number to be pro
                                   double max, /**< the max value for clamping */
                                   jerryx_arg_int_option_t option) /**< the converting policies */
 {
-  if (isnan (*d))
+  if (*d != *d) /* isnan (*d) triggers conversion warning on clang<9 */
   {
     return jerry_create_error (JERRY_ERROR_TYPE,
                                (jerry_char_t *) "The number is NaN.");
@@ -228,7 +228,7 @@ jerryx_arg_transform_boolean_strict (jerryx_arg_js_iterator_t *js_arg_iter_p, /*
   }
 
   bool *dest = c_arg_p->dest;
-  *dest = jerry_get_boolean_value (js_arg);
+  *dest = jerry_value_is_true (js_arg);
 
   return jerry_create_undefined ();
 } /* jerryx_arg_transform_boolean_strict */

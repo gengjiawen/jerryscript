@@ -25,6 +25,12 @@ import subprocess
 import sys
 import settings
 
+if sys.version_info.major >= 3:
+    import runners.util as util  # pylint: disable=import-error
+else:
+    sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/runners')
+    import util
+
 OUTPUT_DIR = os.path.join(settings.PROJECT_DIR, 'build', 'tests')
 
 Options = collections.namedtuple('Options', ['name', 'build_args', 'test_args', 'skip'])
@@ -51,57 +57,47 @@ OPTIONS_DOCTESTS = ['--doctests=on', '--jerry-cmdline=off', '--error-messages=on
 # Test options for unittests
 JERRY_UNITTESTS_OPTIONS = [
     Options('unittests-es.next',
-            OPTIONS_COMMON + OPTIONS_UNITTESTS + OPTIONS_PROFILE_ESNEXT),
-    Options('unittests-es.next-debug',
-            OPTIONS_COMMON + OPTIONS_UNITTESTS + OPTIONS_PROFILE_ESNEXT + OPTIONS_DEBUG),
+            OPTIONS_COMMON + OPTIONS_UNITTESTS + OPTIONS_PROFILE_ESNEXT
+            + ['--promise-callback=on']),
     Options('doctests-es.next',
-            OPTIONS_COMMON + OPTIONS_DOCTESTS + OPTIONS_PROFILE_ESNEXT),
-    Options('doctests-es.next-debug',
-            OPTIONS_COMMON + OPTIONS_DOCTESTS + OPTIONS_PROFILE_ESNEXT + OPTIONS_DEBUG),
+            OPTIONS_COMMON + OPTIONS_DOCTESTS + OPTIONS_PROFILE_ESNEXT
+            + ['--promise-callback=on']),
     Options('unittests-es5.1',
             OPTIONS_COMMON + OPTIONS_UNITTESTS + OPTIONS_PROFILE_ES51),
-    Options('unittests-es5.1-debug',
-            OPTIONS_COMMON + OPTIONS_UNITTESTS + OPTIONS_PROFILE_ES51 + OPTIONS_DEBUG),
     Options('doctests-es5.1',
             OPTIONS_COMMON + OPTIONS_DOCTESTS + OPTIONS_PROFILE_ES51),
-    Options('doctests-es5.1-debug',
-            OPTIONS_COMMON + OPTIONS_DOCTESTS + OPTIONS_PROFILE_ES51 + OPTIONS_DEBUG),
-    Options('unittests-es5.1-debug-init-fini',
-            OPTIONS_COMMON + OPTIONS_UNITTESTS + OPTIONS_PROFILE_ES51 + OPTIONS_DEBUG
+    Options('unittests-es5.1-init-fini',
+            OPTIONS_COMMON + OPTIONS_UNITTESTS + OPTIONS_PROFILE_ES51
             + ['--cmake-param=-DFEATURE_INIT_FINI=ON'],
             skip=skip_if((sys.platform == 'win32'), 'FEATURE_INIT_FINI build flag isn\'t supported on Windows,' +
                          ' because Microsoft Visual C/C++ Compiler doesn\'t support' +
                          ' library constructors and destructors.')),
+    Options('unittests-es5.1-math',
+            OPTIONS_COMMON + OPTIONS_UNITTESTS + OPTIONS_PROFILE_ES51
+            + ['--jerry-math=on']),
 ]
 
 # Test options for jerry-tests
 JERRY_TESTS_OPTIONS = [
-    Options('jerry_tests-es.next-debug',
-            OPTIONS_COMMON + OPTIONS_PROFILE_ESNEXT + OPTIONS_DEBUG + OPTIONS_STACK_LIMIT + OPTIONS_GC_MARK_LIMIT
+    Options('jerry_tests-es.next',
+            OPTIONS_COMMON + OPTIONS_PROFILE_ESNEXT + OPTIONS_STACK_LIMIT + OPTIONS_GC_MARK_LIMIT
             + OPTIONS_MEM_STRESS),
     Options('jerry_tests-es5.1',
             OPTIONS_COMMON + OPTIONS_PROFILE_ES51 + OPTIONS_STACK_LIMIT + OPTIONS_GC_MARK_LIMIT),
     Options('jerry_tests-es5.1-snapshot',
             OPTIONS_COMMON + OPTIONS_PROFILE_ES51 + OPTIONS_SNAPSHOT + OPTIONS_STACK_LIMIT + OPTIONS_GC_MARK_LIMIT,
             ['--snapshot']),
-    Options('jerry_tests-es5.1-debug',
-            OPTIONS_COMMON + OPTIONS_PROFILE_ES51 + OPTIONS_DEBUG + OPTIONS_STACK_LIMIT + OPTIONS_GC_MARK_LIMIT
-            + OPTIONS_MEM_STRESS),
-    Options('jerry_tests-es5.1-debug-snapshot',
-            OPTIONS_COMMON + OPTIONS_PROFILE_ES51 + OPTIONS_SNAPSHOT + OPTIONS_DEBUG + OPTIONS_STACK_LIMIT
-            + OPTIONS_GC_MARK_LIMIT, ['--snapshot']),
-    Options('jerry_tests-es5.1-debug-cpointer_32bit',
-            OPTIONS_COMMON + OPTIONS_PROFILE_ES51 + OPTIONS_DEBUG + OPTIONS_STACK_LIMIT + OPTIONS_GC_MARK_LIMIT
+    Options('jerry_tests-es5.1-cpointer_32bit',
+            OPTIONS_COMMON + OPTIONS_PROFILE_ES51 + OPTIONS_STACK_LIMIT + OPTIONS_GC_MARK_LIMIT
             + ['--cpointer-32bit=on', '--mem-heap=1024']),
-    Options('jerry_tests-es5.1-debug-external_context',
-            OPTIONS_COMMON + OPTIONS_PROFILE_ES51 + OPTIONS_DEBUG + OPTIONS_STACK_LIMIT + OPTIONS_GC_MARK_LIMIT
+    Options('jerry_tests-es5.1-external_context',
+            OPTIONS_COMMON + OPTIONS_PROFILE_ES51 + OPTIONS_STACK_LIMIT + OPTIONS_GC_MARK_LIMIT
             + ['--external-context=on']),
 ]
 
 # Test options for test262
 TEST262_TEST_SUITE_OPTIONS = [
     Options('test262_tests', OPTIONS_PROFILE_ES51),
-    Options('test262_tests-debug', OPTIONS_PROFILE_ES51 + OPTIONS_DEBUG)
 ]
 
 # Test options for test262-es2015
@@ -118,7 +114,7 @@ TEST262_ESNEXT_TEST_SUITE_OPTIONS = [
 # Test options for jerry-debugger
 DEBUGGER_TEST_OPTIONS = [
     Options('jerry_debugger_tests',
-            OPTIONS_DEBUG + ['--jerry-debugger=on'])
+            ['--jerry-debugger=on'])
 ]
 
 # Test options for buildoption-test
@@ -129,8 +125,8 @@ JERRY_BUILDOPTIONS = [
             ['--error-messages=on']),
     Options('buildoption_test-logging',
             ['--logging=on']),
-    Options('buildoption_test-all_in_one',
-            ['--all-in-one=on']),
+    Options('buildoption_test-amalgam',
+            ['--amalgam=on']),
     Options('buildoption_test-valgrind',
             ['--valgrind=on']),
     Options('buildoption_test-mem_stats',
@@ -145,11 +141,10 @@ JERRY_BUILDOPTIONS = [
                 platform.system() != 'Linux' or (platform.machine() != 'i386' and platform.machine() != 'x86_64'),
                 '-m32 is only supported on x86[-64]-linux')
            ),
-    Options('buildoption_test-no_jerry_libm',
-            ['--jerry-libm=off', '--link-lib=m'],
-            skip=skip_if((sys.platform == 'win32'), 'There is no separated libm on Windows')),
+    Options('buildoption_test-jerry_math',
+            ['--jerry-math=on']),
     Options('buildoption_test-no_lcache_prophashmap',
-            ['--compile-flag=-DJERRY_LCACHE=0', '--compile-flag=-DJERRY_PROPRETY_HASHMAP=0']),
+            ['--compile-flag=-DJERRY_LCACHE=0', '--compile-flag=-DJERRY_PROPERTY_HASHMAP=0']),
     Options('buildoption_test-external_context',
             ['--external-context=on']),
     Options('buildoption_test-shared_libs',
@@ -164,8 +159,6 @@ JERRY_BUILDOPTIONS = [
             OPTIONS_STACK_LIMIT),
     Options('buildoption_test-gc-mark_limit',
             OPTIONS_GC_MARK_LIMIT),
-    Options('buildoption_test-single-source',
-            ['--cmake-param=-DENABLE_ALL_IN_ONE_SOURCE=ON']),
     Options('buildoption_test-jerry-debugger',
             ['--jerry-debugger=on']),
     Options('buildoption_test-module-off',
@@ -201,6 +194,8 @@ def get_arguments():
                         help='Run license check')
     parser.add_argument('--check-magic-strings', action='store_true',
                         help='Run "magic string source code generator should be executed" check')
+    parser.add_argument('--build-debug', action='store_true',
+                        help='Build debug version jerryscript')
     parser.add_argument('--jerry-debugger', action='store_true',
                         help='Run jerry-debugger tests')
     parser.add_argument('--jerry-tests', action='store_true',
@@ -258,23 +253,21 @@ def report_skip(job):
         sys.stderr.write(' (%s)' % job.skip)
     sys.stderr.write('%s\n' % TERM_NORMAL)
 
-def get_platform_cmd_prefix():
-    if sys.platform == 'win32':
-        return ['cmd', '/S', '/C']
-    return []
-
 def create_binary(job, options):
     build_args = job.build_args[:]
+    build_dir_path = os.path.join(options.outdir, job.name)
+    if options.build_debug:
+        build_args.extend(OPTIONS_DEBUG)
+        build_dir_path = os.path.join(options.outdir, job.name + '-debug')
     if options.buildoptions:
         for option in options.buildoptions.split(','):
             if option not in build_args:
                 build_args.append(option)
 
-    build_cmd = get_platform_cmd_prefix()
+    build_cmd = util.get_python_cmd_prefix()
     build_cmd.append(settings.BUILD_SCRIPT)
     build_cmd.extend(build_args)
 
-    build_dir_path = os.path.join(options.outdir, job.name)
     build_cmd.append('--builddir=%s' % build_dir_path)
 
     install_dir_path = os.path.join(build_dir_path, 'local')
@@ -339,7 +332,7 @@ def iterate_test_runner_jobs(jobs, options):
         else:
             tested_hashes[bin_hash] = build_dir_path
 
-        test_cmd = get_platform_cmd_prefix()
+        test_cmd = util.get_python_cmd_prefix()
         test_cmd.extend([settings.TEST_RUNNER_SCRIPT, '--engine', bin_path])
 
         yield job, ret_build, test_cmd
@@ -433,9 +426,10 @@ def run_test262_test_suite(options):
             print("\n%sBuild failed%s\n" % (TERM_RED, TERM_NORMAL))
             break
 
-        test_cmd = get_platform_cmd_prefix() + [
+        test_cmd = util.get_python_cmd_prefix() + [
             settings.TEST262_RUNNER_SCRIPT,
-            '--engine', get_binary_path(build_dir_path) + " --test262-object",
+            '--engine', get_binary_path(build_dir_path),
+            '--test262-object',
             '--test-dir', settings.TEST262_TEST_SUITE_DIR
         ]
 
@@ -471,7 +465,7 @@ def run_unittests(options):
             break
 
         if sys.platform == 'win32':
-            if "--debug" in job.build_args:
+            if options.build_debug:
                 build_config = "Debug"
             else:
                 build_config = "MinSizeRel"
@@ -480,7 +474,7 @@ def run_unittests(options):
 
 
         ret_test |= run_check(
-            get_platform_cmd_prefix() +
+            util.get_python_cmd_prefix() +
             [settings.UNITTEST_RUNNER_SCRIPT] +
             [os.path.join(build_dir_path, 'tests', build_config)] +
             (["-q"] if options.quiet else [])

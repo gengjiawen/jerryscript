@@ -16,12 +16,20 @@
 #ifndef ECMA_MODULE_H
 #define ECMA_MODULE_H
 
-#if ENABLED (JERRY_MODULE_SYSTEM)
-
 #include "common.h"
 #include "ecma-globals.h"
 
+#if JERRY_MODULE_SYSTEM
+
 #define ECMA_MODULE_MAX_PATH 255u
+
+/**
+ * Module status flags.
+ */
+typedef enum
+{
+  ECMA_MODULE_IS_NATIVE = (1 << 0), /**< native module */
+} ecma_module_flags_t;
 
 /**
  * Imported or exported names, such as "a as b"
@@ -35,57 +43,53 @@ typedef struct ecma_module_names
   ecma_string_t *local_name_p;      /**< Local name of the item */
 } ecma_module_names_t;
 
-typedef struct ecma_module ecma_module_t;
+/**
+ * Module structure storing an instance of a module
+ *
+ * Note:
+ *      The imports_p list follows the order of import-from/export-from statements in the source
+ *      code of a module, even if a given module specifier is only used by export-from statements.
+ */
+typedef struct ecma_module
+{
+  /* Note: state is stored in header.u.class_prop.extra_info */
+  ecma_extended_object_t header;                   /**< header part */
+  /* TODO(dbatyai): These could be compressed pointers */
+  ecma_object_t *scope_p;                          /**< lexical lenvironment of the module */
+  ecma_object_t *namespace_object_p;               /**< namespace object of the module */
+  struct ecma_module_node *imports_p;              /**< import requests of the module */
+  ecma_module_names_t *local_exports_p;            /**< local exports of the module */
+  struct ecma_module_node *indirect_exports_p;     /**< indirect exports of the module */
+  struct ecma_module_node *star_exports_p;         /**< star exports of the module */
+
+  /* Code used for evaluating a module */
+  union
+  {
+    ecma_compiled_code_t *compiled_code_p;         /**< compiled code for the module */
+    jerry_native_module_evaluate_callback_t callback; /**< callback for evaluating native modules */
+  } u;
+} ecma_module_t;
 
 /**
  * Module node to store imports / exports.
+ *
+ * Note:
+ *      Only one module node is created for each module specifier: the names are
+ *      concatenated if the same specifier is used multiple times in the source code.
+ *      However, multiple nodes are created for modules with multiple alias
+ *      (for example ./a.mjs and ././a.mjs can refer to the same module).
  */
 typedef struct ecma_module_node
 {
-  struct ecma_module_node *next_p;     /**< next linked list node */
+  struct ecma_module_node *next_p; /**< next linked list node */
   ecma_module_names_t *module_names_p; /**< names of the requested import/export node */
-  ecma_module_t *module_request_p;     /**< module structure of the requested module */
+
+  union
+  {
+    ecma_value_t path_or_module; /**< imports: module specifier (if string) or module reference (if object) */
+    ecma_value_t *module_object_p; /**< non-imports: reference to a path_or_module field in the imports */
+  } u;
 } ecma_module_node_t;
-
-/**
- * Module context containing all import and export nodes.
- */
-typedef struct ecma_module_context
-{
-  struct ecma_module_context *parent_p;   /**< parent context */
-  ecma_module_node_t *imports_p;          /**< import item of the current context */
-  ecma_module_node_t *local_exports_p;    /**< export item of the current context */
-  ecma_module_node_t *indirect_exports_p; /**< export item of the current context */
-  ecma_module_node_t *star_exports_p;     /**< export item of the current context */
-  ecma_module_t *module_p;                /**< module request */
-} ecma_module_context_t;
-
-/**
- * An enum identifing the current state of the module
- */
-typedef enum
-{
-  ECMA_MODULE_STATE_INIT = 0,       /**< module is initialized */
-  ECMA_MODULE_STATE_PARSING = 1,    /**< module is currently being parsed */
-  ECMA_MODULE_STATE_PARSED = 2,     /**< module has been parsed */
-  ECMA_MODULE_STATE_EVALUATING = 3, /**< module is currently being evaluated */
-  ECMA_MODULE_STATE_EVALUATED = 4,  /**< module has been evaluated */
-  ECMA_MODULE_STATE_NATIVE = 5,     /**< module is native */
-} ecma_module_state_t;
-
-/**
- * Module structure storing an instance of a module
- */
-struct ecma_module
-{
-  struct ecma_module *next_p;            /**< next linked list node */
-  ecma_module_state_t state;             /**< state of the mode */
-  ecma_string_t *path_p;                 /**< path of the module */
-  ecma_module_context_t *context_p;      /**< module context of the module */
-  ecma_compiled_code_t *compiled_code_p; /**< compiled code of the module */
-  ecma_object_t *scope_p;                /**< lexica lenvironment of the module */
-  ecma_object_t *namespace_object_p;     /**< namespace import object of the module */
-};
 
 /**
  *  A record that can be used to store {module, identifier} pairs
@@ -116,29 +120,21 @@ typedef struct ecma_module_resolve_stack
   bool resolving;                           /**< flag storing wether the current frame started resolving */
 } ecma_module_resolve_stack_t;
 
-bool ecma_module_resolve_set_insert (ecma_module_resolve_set_t **set_p,
-                                     ecma_module_t *const module_p,
-                                     ecma_string_t *const export_name_p);
-void ecma_module_resolve_set_cleanup (ecma_module_resolve_set_t *set_p);
+ecma_value_t ecma_module_initialize (ecma_module_t *module_p);
+ecma_module_t *ecma_module_get_resolved_module (ecma_value_t module_val);
 
-void ecma_module_resolve_stack_push (ecma_module_resolve_stack_t **stack_p,
-                                     ecma_module_t *const module_p,
-                                     ecma_string_t *const export_name_p);
-void ecma_module_resolve_stack_pop (ecma_module_resolve_stack_t **stack_p);
+ecma_value_t ecma_module_link (ecma_module_t *module_p,
+                               jerry_module_resolve_callback_t callback_p,
+                               void *user_p);
+ecma_value_t ecma_module_evaluate (ecma_module_t *module_p);
 
-ecma_string_t *ecma_module_create_normalized_path (const uint8_t *char_p,
-                                                   prop_length_t size);
-ecma_module_t *ecma_module_find_module (ecma_string_t *const path_p);
-ecma_module_t *ecma_module_create_native_module (ecma_string_t *const path_p,
-                                                 ecma_object_t *const namespace_p);
-ecma_module_t *ecma_module_find_or_create_module (ecma_string_t *const path_p);
+ecma_module_t *ecma_module_create (void);
+void ecma_module_cleanup_context (void);
+ecma_value_t ecma_module_create_namespace_object (ecma_module_t *module_p);
 
-ecma_value_t ecma_module_initialize_current (void);
-ecma_value_t ecma_module_parse_modules (void);
-ecma_value_t ecma_module_check_indirect_exports (void);
+void ecma_module_release_module_names (ecma_module_names_t *module_name_p);
+void ecma_module_release_module (ecma_module_t *module_p);
 
-void ecma_module_release_module_nodes (ecma_module_node_t *module_node_p);
-void ecma_module_cleanup (void);
-#endif /* ENABLED (JERRY_MODULE_SYSTEM) */
+#endif /* JERRY_MODULE_SYSTEM */
 
 #endif /* !ECMA_MODULE_H */

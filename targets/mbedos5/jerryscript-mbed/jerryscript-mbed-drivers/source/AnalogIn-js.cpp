@@ -22,7 +22,8 @@
  *
  * Called if/when the AnalogIn is GC'ed.
  */
-void NAME_FOR_CLASS_NATIVE_DESTRUCTOR(AnalogIn)(void* void_ptr) {
+void NAME_FOR_CLASS_NATIVE_DESTRUCTOR(AnalogIn)(void* void_ptr, jerry_object_native_info_t *info_p) {
+    (void) info_p;
     delete static_cast<AnalogIn*>(void_ptr);
 }
 
@@ -47,7 +48,7 @@ DECLARE_CLASS_FUNCTION(AnalogIn, read) {
 
     // Extract native AnalogIn pointer
     void* void_ptr;
-    bool has_ptr = jerry_get_object_native_pointer(this_obj, &void_ptr, &native_obj_type_info);
+    bool has_ptr = jerry_get_object_native_pointer(call_info_p->this_value, &void_ptr, &native_obj_type_info);
 
     if (!has_ptr) {
         return jerry_create_error(JERRY_ERROR_TYPE,
@@ -72,7 +73,7 @@ DECLARE_CLASS_FUNCTION(AnalogIn, read_u16) {
 
     // Extract native AnalogIn pointer
     void* void_ptr;
-    bool has_ptr = jerry_get_object_native_pointer(this_obj, &void_ptr, &native_obj_type_info);
+    bool has_ptr = jerry_get_object_native_pointer(call_info_p->this_value, &void_ptr, &native_obj_type_info);
 
     if (!has_ptr) {
         return jerry_create_error(JERRY_ERROR_TYPE,

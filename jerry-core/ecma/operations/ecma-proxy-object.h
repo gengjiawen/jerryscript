@@ -25,24 +25,21 @@
  * @{
  */
 
-#if ENABLED (JERRY_BUILTIN_PROXY)
+#if JERRY_BUILTIN_PROXY
 
 ecma_object_t *
 ecma_proxy_create (ecma_value_t target,
-                   ecma_value_t handler);
+                   ecma_value_t handler,
+                   uint32_t options);
 
 ecma_object_t *
 ecma_proxy_create_revocable (ecma_value_t target,
                              ecma_value_t handler);
 
 ecma_value_t
-ecma_proxy_revoke_cb (const ecma_value_t function_obj,
-                      const ecma_value_t this_val,
+ecma_proxy_revoke_cb (ecma_object_t *function_obj_p,
                       const ecma_value_t args_p[],
                       const uint32_t args_count);
-
-jmem_cpointer_t
-ecma_proxy_object_prototype_to_cp (ecma_value_t proto);
 
 ecma_value_t
 ecma_proxy_object_find (ecma_object_t *obj_p,
@@ -109,7 +106,7 @@ ecma_proxy_object_construct (ecma_object_t *obj_p,
                              const ecma_value_t *args_p,
                              uint32_t argc);
 
-#endif /* ENABLED (JERRY_BUILTIN_PROXY) */
+#endif /* JERRY_BUILTIN_PROXY */
 
 /**
  * @}
